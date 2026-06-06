@@ -1,5 +1,5 @@
 // 仅用于 room-page 的类型
-import { ContentData, PlayMode, PlaylistImportProgress, RoomQueue } from "./index"
+import { ContentData, PlayMode, PlaylistImportProgress, RoomPermissionConfig, RoomQueue, RoomRole } from "./index"
 
 /**
  * 1: 正在进入房间...
@@ -36,7 +36,10 @@ export interface PageData {
   participants: PageParticipant[],
   showMoreBox: boolean,
   amIOwner: boolean,
+  roomRole: RoomRole,
+  ownerGuestId?: string,
   everyoneCanOperatePlayer: "Y" | "N"
+  permissions: RoomPermissionConfig
   queue?: RoomQueue
   playlistImportMessage?: string
   playlistImportProgress?: PlaylistImportProgress
@@ -57,6 +60,7 @@ export interface RoomStatus {
   contentStamp: number
   operateStamp: number
   everyoneCanOperatePlayer?: "Y" | "N"
+  permissions?: RoomPermissionConfig
   content?: ContentData
   queue?: RoomQueue
   currentIndex?: number
@@ -65,14 +69,22 @@ export interface RoomStatus {
 }
 
 export interface WsMsgRes {
-  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO"
+  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR"
   roomStatus?: RoomStatus
   roomInfo?: {
     roomId: string
     roomName?: string
     deleted?: boolean
+    ownerGuestId?: string
+    everyoneCanOperatePlayer?: "Y" | "N"
+    permissions?: RoomPermissionConfig
   }
   playlistImportProgress?: PlaylistImportProgress
+  operationError?: {
+    roomId: string
+    operateType?: string
+    message: string
+  }
 }
 
 export type RevokeType = "ws" | "http" | "check"

@@ -6,6 +6,7 @@ import { getPlaylistImportProgress, importPlaylistByLink, setPlaylistImportBroad
 import { buildPlaybackUpdate, canOperatePlayer, shouldIgnoreRapidSameOperator } from "./playbackService"
 import { buildQueueRoomStatus, canOperateQueue, contentToQueueItem, getNextQueueIndex, getSkipQueueIndex, isPlayMode, moveQueueItemAfterCurrent, normalizeQueue, reconcileQueueCurrent, removeQueueItem, sanitizeQueueItems } from "./queueService"
 import { broadcaster } from "./websocket/broadcaster"
+import { DEFAULT_ROOM_CONFIG, canControlPlayback, canImportPlaylist, normalizeRoomConfig } from "./permissionService"
 import type {
   ContentData,
   QueueItem,
@@ -30,9 +31,7 @@ import type {
 const LAZY_RESOLVE_ROOM_INTERVAL_MS = 2000
 const LAZY_RESOLVE_FAIL_COOLDOWN_MS = 30 * 1000
 const STALE_PAUSE_AFTER_QUEUE_SWITCH_MS = 2500
-const defaultRoomCfg: RoomConfig = {
-  everyoneCanOperatePlayer: "Y"
-}
+const defaultRoomCfg: RoomConfig = DEFAULT_ROOM_CONFIG
 
 const lazyResolveRoomStamps = new Map<string, number>()
 const lazyResolveFailCache = new Map<string, number>()
@@ -123,7 +122,7 @@ async function handleFirstSend(socket: PtWebSocket, req: ReqBase): Promise<void>
     return
   }
 
-  const roomCfg = room.config || defaultRoomCfg
+  const roomCfg = normalizeRoomConfig(room.config || defaultRoomCfg)
   const queue = normalizeQueue(room.queue)
   socket.roomId = req.roomId
   broadcaster.send(socket, {
@@ -138,6 +137,7 @@ async function handleFirstSend(socket: PtWebSocket, req: ReqBase): Promise<void>
       contentStamp: room.contentStamp,
       operateStamp: room.operateStamp,
       everyoneCanOperatePlayer: roomCfg.everyoneCanOperatePlayer,
+      permissions: roomCfg.permissions,
       queue,
       currentIndex: queue?.currentIndex,
       currentItemId: queue?.currentItemId,
@@ -159,7 +159,10 @@ async function handleSetPlayer(socket: PtWebSocket, req: ReqOperatePlayer): Prom
 
   const clientId = req["x-pt-local-id"]
   const isOwner = room.owner === clientId
-  if (!canOperatePlayer(room, clientId, defaultRoomCfg)) return
+  if (!canOperatePlayer(room, clientId, defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
 
   const guestId = getOperatorGuestId(clientId, room)
   if (!guestId) {
@@ -178,14 +181,22 @@ async function handleSetPlayer(socket: PtWebSocket, req: ReqOperatePlayer): Prom
 async function handleSetQueueIndex(socket: PtWebSocket, req: ReqSetQueueIndex): Promise<void> {
   const room = roomRepo.get(req.roomId)
   const queue = normalizeQueue(room?.queue)
-  if (!room || !queue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room || !queue) return
+  if (!canControlPlayback(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
   await switchQueueIndex(req.roomId, { ...room, queue }, req.index, req["x-pt-stamp"], req["x-pt-local-id"], "PLAYING")
 }
 
 async function handleAdvanceQueue(socket: PtWebSocket, req: ReqAdvanceQueue): Promise<void> {
   const room = roomRepo.get(req.roomId)
   const queue = normalizeQueue(room?.queue)
-  if (!room || !queue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room || !queue) return
+  if (!canControlPlayback(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
   if (req.fromIndex !== queue.currentIndex) return
 
   const nextIndex = getNextQueueIndex(queue, req.direction)
@@ -200,7 +211,11 @@ async function handleAdvanceQueue(socket: PtWebSocket, req: ReqAdvanceQueue): Pr
 async function handleSetPlayMode(socket: PtWebSocket, req: ReqSetPlayMode): Promise<void> {
   const room = roomRepo.get(req.roomId)
   const baseQueue = normalizeQueue(room?.queue)
-  if (!room || !baseQueue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room || !baseQueue) return
+  if (!canControlPlayback(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
   const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
   if (!guestId || !isPlayMode(req.playMode)) return
 
@@ -211,7 +226,11 @@ async function handleSetPlayMode(socket: PtWebSocket, req: ReqSetPlayMode): Prom
 
 async function handleAppendQueue(socket: PtWebSocket, req: ReqAppendQueue): Promise<void> {
   const room = roomRepo.get(req.roomId)
-  if (!room || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room) return
+  if (!canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg) && !canImportPlaylist(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
   const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
   if (!guestId) return
 
@@ -228,7 +247,11 @@ async function handleAppendQueue(socket: PtWebSocket, req: ReqAppendQueue): Prom
 
 async function handleImportPlaylist(socket: PtWebSocket, req: ReqImportPlaylist): Promise<void> {
   const room = roomRepo.get(req.roomId)
-  if (!room || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room) return
+  if (!canImportPlaylist(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
   if (!getOperatorGuestId(req["x-pt-local-id"], room)) return
   if (!/^https?:\/\//i.test(req.link || "")) return
 
@@ -242,7 +265,11 @@ async function handleImportPlaylist(socket: PtWebSocket, req: ReqImportPlaylist)
 async function handleQueueRemoveItem(socket: PtWebSocket, req: ReqQueueRemoveItem): Promise<void> {
   const room = roomRepo.get(req.roomId)
   const baseQueue = normalizeQueue(room?.queue)
-  if (!room || !baseQueue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room || !baseQueue) return
+  if (!canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
   const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
   if (!guestId) return
 
@@ -288,7 +315,11 @@ async function handleQueueRemoveItem(socket: PtWebSocket, req: ReqQueueRemoveIte
 async function handleQueueSkipCurrent(socket: PtWebSocket, req: ReqQueueSkipCurrent): Promise<void> {
   const room = roomRepo.get(req.roomId)
   const queue = normalizeQueue(room?.queue)
-  if (!room || !queue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room || !queue) return
+  if (!canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
 
   const nextIndex = getSkipQueueIndex(queue)
   if (nextIndex < 0) {
@@ -302,7 +333,11 @@ async function handleQueueSkipCurrent(socket: PtWebSocket, req: ReqQueueSkipCurr
 async function handleQueuePlayNext(socket: PtWebSocket, req: ReqQueuePlayNext): Promise<void> {
   const room = roomRepo.get(req.roomId)
   const baseQueue = normalizeQueue(room?.queue)
-  if (!room || !baseQueue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  if (!room || !baseQueue) return
+  if (!canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) {
+    sendOperationError(socket, req)
+    return
+  }
   const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
   if (!guestId) return
 
@@ -481,6 +516,26 @@ function getOperatorGuestId(clientId: string, room?: Room): string | undefined {
 
 function isSpeedRate(value: string): value is SpeedRate {
   return ["0.8", "1", "1.2", "1.5", "1.7"].includes(value)
+}
+
+function sendOperationError(socket: PtWebSocket, req: ReqBase): void {
+  broadcaster.send(socket, {
+    responseType: "OPERATION_ERROR",
+    operationError: {
+      roomId: req.roomId,
+      operateType: req.operateType,
+      message: getPermissionDeniedMessage(req.operateType)
+    }
+  })
+}
+
+function getPermissionDeniedMessage(operateType: string): string {
+  if (operateType === "IMPORT_PLAYLIST") return "房主已关闭普通成员导入歌单权限"
+  if (operateType === "QUEUE_REMOVE_ITEM" || operateType === "QUEUE_SKIP_CURRENT" || operateType === "QUEUE_PLAY_NEXT") {
+    return "房主已关闭普通成员管理队列权限"
+  }
+  if (operateType === "APPEND_QUEUE") return "房主已关闭普通成员添加歌曲或导入歌单权限"
+  return "房主已关闭普通成员播放控制权限"
 }
 
 function rememberQueueSwitchPauseGuard(roomId: string, guestId: string): void {

@@ -10,6 +10,8 @@ import { dbPath } from "./db"
 import { getUploadRoot, handleUploadAudio, handleUploadError, uploadMiddleware } from "./upload"
 import { cancelPlaylistImport } from "./playlistImport"
 import { env } from "./config/env"
+import { roomRepo } from "./db"
+import { canImportPlaylist } from "./permissionService"
 
 const app = express()
 const port = env.port
@@ -51,8 +53,27 @@ app.use(handleUploadError)
 
 app.post("/api/playlist-import/cancel", (req, res) => {
   const roomId = typeof req.body?.roomId === "string" ? req.body.roomId : ""
+  const clientId = typeof req.body?.["x-pt-local-id"] === "string" ? req.body["x-pt-local-id"] : ""
   if (!roomId) {
     res.json({ code: "E4000", message: "缺少 roomId" })
+    return
+  }
+  if (!clientId) {
+    res.json({ code: "E4000", message: "缺少用户身份" })
+    return
+  }
+
+  const room = roomRepo.get(roomId)
+  if (!room || room.oState === "DELETED") {
+    res.json({ code: "E4004", message: "房间不存在" })
+    return
+  }
+  if (room.oState === "EXPIRED") {
+    res.json({ code: "E4006", message: "房间已过期" })
+    return
+  }
+  if (!canImportPlaylist(room, clientId)) {
+    res.json({ code: "E4003", message: "房主已关闭普通成员导入歌单权限" })
     return
   }
 

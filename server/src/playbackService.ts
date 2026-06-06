@@ -1,13 +1,12 @@
 import type { ReqOperatePlayer, Room, RoomConfig, RoomStatus } from "./types"
+import { canControlPlayback, normalizeRoomConfig } from "./permissionService"
 
 export const MIN_DURATION_FOR_A_PERSON = 250
 
 // Playback service owns play/pause/seek timestamps and speedRate reporting.
 // It should not mutate queue order or room metadata.
 export function canOperatePlayer(room: Room, clientId: string, defaultRoomCfg: RoomConfig): boolean {
-  const roomCfg = room.config || defaultRoomCfg
-  const isOwner = room.owner === clientId
-  return isOwner || roomCfg.everyoneCanOperatePlayer !== "N"
+  return canControlPlayback(room, clientId, defaultRoomCfg)
 }
 
 export function shouldIgnoreRapidSameOperator(room: Room, guestId: string, operateStamp: number): boolean {
@@ -23,7 +22,7 @@ export function buildPlaybackUpdate(input: {
   defaultRoomCfg: RoomConfig
 }): { patch: Partial<Room>; roomStatus: RoomStatus } {
   const { room, roomId, req, guestId, isOwner, defaultRoomCfg } = input
-  const roomCfg = room.config || defaultRoomCfg
+  const roomCfg = normalizeRoomConfig(room.config || defaultRoomCfg)
   const newRoomCfg = { ...roomCfg }
   const patch: Partial<Room> = {
     playStatus: req.playStatus,
@@ -44,8 +43,13 @@ export function buildPlaybackUpdate(input: {
 
   if (req.everyoneCanOperatePlayer && isOwner) {
     newRoomCfg.everyoneCanOperatePlayer = req.everyoneCanOperatePlayer
+    newRoomCfg.permissions = {
+      ...roomCfg.permissions,
+      memberCanControlPlayback: req.everyoneCanOperatePlayer !== "N"
+    }
     patch.config = newRoomCfg
     roomStatus.everyoneCanOperatePlayer = req.everyoneCanOperatePlayer
+    roomStatus.permissions = newRoomCfg.permissions
   }
 
   return { patch, roomStatus }

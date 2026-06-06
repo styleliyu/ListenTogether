@@ -5,7 +5,7 @@
  */
 import { ref, reactive, onActivated, onDeactivated, nextTick } from "vue"
 import { PageData, PageState, WsMsgRes, RoomStatus, PlayStatus, RevokeType } from "../../../type/type-room-page"
-import { ContentData, PlayMode, QueueItem, RequestRes, RoRes, RoomQueue } from "../../../type"
+import { ContentData, PlayMode, QueueItem, RequestRes, RoRes, RoomPermissionConfig, RoomQueue } from "../../../type"
 import { RouteLocationNormalizedLoaded } from "vue-router"
 import { useRouteAndPtRouter, PtRouter, goHome } from "../../../routes/pt-router"
 import ptUtil from "../../../utils/pt-util"
@@ -19,13 +19,18 @@ import ptApi from "../../../utils/pt-api"
 import { initPlayer } from "./init-player"
 import { initWebSocket, sendToWebSocket } from "./init-websocket"
 import { shareData } from "./init-share"
-import { request_cancel_playlist_import, request_delete_room, request_enter, request_heartbeat, request_leave, request_parse, request_set_room_name } from "./room-request"
+import { request_cancel_playlist_import, request_delete_room, request_enter, request_heartbeat, request_leave, request_parse, request_set_room_name, request_set_room_permissions, request_transfer_owner } from "./room-request"
 
 // 涓€浜涘父閲?
 const COLLECT_TIMEOUT = 300    // 鏀堕泦鏈€鏂扮姸鎬佺殑鏈€灏忛棿闅?
 const MAX_HB_NUM = 960    // 蹇冭烦鏈€澶氳疆璇㈡鏁帮紱濡傛灉姣?15s 涓€娆★紝鐩稿綋浜?4hr
 const PAUSED_IDLE_LEAVE_TIMEOUT_SEC = 30 * 60
 const STALE_PLAYBACK_REPORT_SUPPRESS_MS = 2500
+const DEFAULT_ROOM_PERMISSIONS: RoomPermissionConfig = {
+  memberCanControlPlayback: true,
+  memberCanManageQueue: true,
+  memberCanImportPlaylist: true
+}
 
 // 鎾斁鍣?
 // 播放器状态区：只有真实切歌可以重建播放器；房间信息、导入面板和倍速 UI 不应触发重建。
@@ -50,7 +55,10 @@ const pageData: PageData = reactive({
   participants: [],
   showMoreBox: false,   // 鏄惁瑕佸睍绀?鈥滃睍寮€鏇村鈥?鐨勬寜閽?
   amIOwner: false,
+  roomRole: "member",
+  ownerGuestId: "",
   everyoneCanOperatePlayer: "Y",
+  permissions: { ...DEFAULT_ROOM_PERMISSIONS },
   queue: undefined,
   playlistImportMessage: "",
   playlistImportProgress: undefined,
@@ -140,18 +148,68 @@ const toEditMyName = async (newName: string) => {
 }
 
 const onEveryoneCanOperatePlayerChange = (opt: { checked: boolean }) => {
-  if(!pageData.amIOwner) return
-  pageData.everyoneCanOperatePlayer = opt.checked ? "Y" : "N"
-  collectLatestStatus()
+  onRoomPermissionChange("memberCanControlPlayback", opt)
 }
 
-const canOperatePlayer = (): boolean => {
-  return pageData.amIOwner || pageData.everyoneCanOperatePlayer !== "N"
+const onRoomPermissionChange = async (key: keyof RoomPermissionConfig, opt: { checked: boolean }) => {
+  if(!pageData.amIOwner) return
+  const nextPermissions: RoomPermissionConfig = {
+    ...pageData.permissions,
+    [key]: opt.checked
+  }
+  const res = await request_set_room_permissions(pageData.roomId, nickName, nextPermissions)
+  if(res?.code !== "0000") {
+    cui.showModal({
+      title: "保存失败",
+      content: res?.showMsg || "权限设置保存失败，请稍后再试。",
+      showCancel: false
+    })
+    return
+  }
+  applyRoomMeta(res.data)
+}
+
+const onTransferOwner = async (targetGuestId: string) => {
+  if(!pageData.amIOwner || !targetGuestId) return
+  const target = pageData.participants.find(item => item.guestId === targetGuestId)
+  const confirm = await cui.showModal({
+    title: "转让房主",
+    content: `确定把房主转让给 ${target?.nickName || "该成员"} 吗？`,
+    cancelText: "取消",
+    confirmText: "转让"
+  })
+  if(confirm.cancel) return
+  const res = await request_transfer_owner(pageData.roomId, nickName, targetGuestId)
+  if(res?.code !== "0000") {
+    cui.showModal({
+      title: "转让失败",
+      content: res?.showMsg || "房主转让失败，请稍后再试。",
+      showCancel: false
+    })
+    return
+  }
+  applyRoomMeta(res.data)
+}
+
+const canControlPlayback = (): boolean => {
+  return pageData.amIOwner || pageData.permissions.memberCanControlPlayback
+}
+
+const canManageQueue = (): boolean => {
+  return pageData.amIOwner || pageData.permissions.memberCanManageQueue
+}
+
+const canImportPlaylist = (): boolean => {
+  return pageData.amIOwner || pageData.permissions.memberCanImportPlaylist
+}
+
+const canAppendQueueByLink = (): boolean => {
+  return canManageQueue() || canImportPlaylist()
 }
 
 const onQueueItemTap = (index: number) => {
-  if(!canOperatePlayer()) {
-    showOperateFailed()
+  if(!canControlPlayback()) {
+    showOperateFailed("房主已关闭普通成员播放控制权限。")
     return
   }
   sendToWebSocket(ws, {
@@ -164,16 +222,16 @@ const onQueueItemTap = (index: number) => {
 }
 
 const onQueueAdvance = (direction: "next" | "prev") => {
-  if(!canOperatePlayer()) {
-    showOperateFailed()
+  if(!canControlPlayback()) {
+    showOperateFailed("房主已关闭普通成员播放控制权限。")
     return
   }
   sendAdvanceQueue(direction)
 }
 
 const onQueueRemoveItem = (item: QueueItem) => {
-  if(!canOperatePlayer()) {
-    showOperateFailed()
+  if(!canManageQueue()) {
+    showOperateFailed("房主已关闭普通成员管理队列权限。")
     return
   }
   if(!item?.id || !canSendQueueAction()) return
@@ -187,8 +245,8 @@ const onQueueRemoveItem = (item: QueueItem) => {
 }
 
 const onQueueSkipCurrent = () => {
-  if(!canOperatePlayer()) {
-    showOperateFailed()
+  if(!canManageQueue()) {
+    showOperateFailed("房主已关闭普通成员管理队列权限。")
     return
   }
   if(!pageData.queue?.items?.length || !canSendQueueAction()) return
@@ -201,8 +259,8 @@ const onQueueSkipCurrent = () => {
 }
 
 const onQueuePlayNext = (item: QueueItem) => {
-  if(!canOperatePlayer()) {
-    showOperateFailed()
+  if(!canManageQueue()) {
+    showOperateFailed("房主已关闭普通成员管理队列权限。")
     return
   }
   if(!item?.id || !canSendQueueAction()) return
@@ -217,8 +275,8 @@ const onQueuePlayNext = (item: QueueItem) => {
 
 const onPlayModeChange = () => {
   if(!pageData.queue) return
-  if(!canOperatePlayer()) {
-    showOperateFailed()
+  if(!canControlPlayback()) {
+    showOperateFailed("房主已关闭普通成员播放控制权限。")
     return
   }
   const order: PlayMode[] = ["sequence", "shuffle", "single"]
@@ -234,8 +292,8 @@ const onPlayModeChange = () => {
 }
 
 const onAppendQueueByLink = async () => {
-  if(!canOperatePlayer()) {
-    showOperateFailed()
+  if(!canAppendQueueByLink()) {
+    showOperateFailed("房主已关闭普通成员添加歌曲或导入歌单权限。")
     return
   }
   const editorRes = await cui.showTextEditor({
@@ -285,6 +343,10 @@ const onAppendQueueByLink = async () => {
 }
 
 const onCancelPlaylistImport = async () => {
+  if(!canImportPlaylist()) {
+    showOperateFailed("房主已关闭普通成员导入歌单权限。")
+    return
+  }
   if(pageData.cancellingPlaylistImport) return
   pageData.cancellingPlaylistImport = true
   try {
@@ -371,6 +433,8 @@ export const useRoomPage = () => {
     toContact, 
     toEditMyName,
     onEveryoneCanOperatePlayerChange,
+    onRoomPermissionChange,
+    onTransferOwner,
     onQueueItemTap,
     onQueueAdvance,
     onQueueRemoveItem,
@@ -453,9 +517,7 @@ function afterEnter(roRes: RoRes) {
   lastAppliedPlaybackSignature = ""
   pageData.content = roRes.content
   pageData.queue = roRes.queue
-  pageData.roomName = roRes.roomName || ""
-  pageData.isPersistent = Boolean(roRes.isPersistent)
-  pageData.amIOwner = roRes?.iamOwner === "Y" ? true : false
+  applyRoomMeta(roRes)
   pageData.participants = showParticipants(roRes.participants, guestId)
   pageData.showMoreBox = handleShowMoreBox(roRes.content)
 
@@ -463,6 +525,40 @@ function afterEnter(roRes: RoRes) {
   heartbeat()
   connectWebSocket()
   shareData(roRes.content, roRes.playStatus, nickName)
+}
+
+function applyRoomMeta(roRes?: Partial<RoRes>) {
+  if(!roRes) return
+  if(typeof roRes.roomName === "string") pageData.roomName = roRes.roomName || ""
+  if(typeof roRes.isPersistent === "boolean") pageData.isPersistent = Boolean(roRes.isPersistent)
+  applyRoomPermissions(roRes.permissions, roRes.everyoneCanOperatePlayer)
+  applyOwnerGuestId(roRes.ownerGuestId)
+  if(roRes.iamOwner) {
+    pageData.amIOwner = roRes.iamOwner === "Y"
+    pageData.roomRole = pageData.amIOwner ? "owner" : "member"
+  }
+  if(roRes.roomRole) {
+    pageData.roomRole = roRes.roomRole
+    pageData.amIOwner = roRes.roomRole === "owner"
+  }
+}
+
+function applyRoomPermissions(permissions?: RoomPermissionConfig, legacy?: "Y" | "N") {
+  const legacyAllowed = legacy === "N" ? false : true
+  const nextPermissions: RoomPermissionConfig = {
+    memberCanControlPlayback: permissions?.memberCanControlPlayback ?? legacyAllowed,
+    memberCanManageQueue: permissions?.memberCanManageQueue ?? legacyAllowed,
+    memberCanImportPlaylist: permissions?.memberCanImportPlaylist ?? legacyAllowed
+  }
+  pageData.permissions = nextPermissions
+  pageData.everyoneCanOperatePlayer = nextPermissions.memberCanControlPlayback ? "Y" : "N"
+}
+
+function applyOwnerGuestId(ownerGuestId?: string) {
+  if(typeof ownerGuestId !== "string") return
+  pageData.ownerGuestId = ownerGuestId
+  pageData.amIOwner = Boolean(guestId && ownerGuestId === guestId)
+  pageData.roomRole = pageData.amIOwner ? "owner" : "member"
 }
 
 // 鍒涘缓鎾斁鍣?
@@ -552,8 +648,8 @@ function createPlayer() {
     if(pageData.amIOwner || !target) return true
     const list = ["play_or_pause", "forward", "backward", "speed", "seek"]
     const isRestricted = list.includes(target)
-    if(pageData.everyoneCanOperatePlayer === "N" && isRestricted) {
-      showOperateFailed()
+    if(!canControlPlayback() && isRestricted) {
+      showOperateFailed("房主已关闭普通成员播放控制权限。")
       return false
     }
     return true
@@ -607,6 +703,10 @@ function sendAdvanceQueue(direction: "next" | "prev" | "auto") {
 }
 
 function sendImportPlaylist(link: string) {
+  if(!canImportPlaylist()) {
+    showOperateFailed("房主已关闭普通成员导入歌单权限。")
+    return
+  }
   sendToWebSocket(ws, {
     operateType: "IMPORT_PLAYLIST",
     roomId: pageData.roomId,
@@ -716,7 +816,10 @@ function applyRoomStatus(status: RoomStatus): RoomStatusClassification {
   }
   if(status.queue) pageData.queue = status.queue
   if(status.everyoneCanOperatePlayer) {
-    pageData.everyoneCanOperatePlayer = status.everyoneCanOperatePlayer
+    applyRoomPermissions(status.permissions, status.everyoneCanOperatePlayer)
+  }
+  else if(status.permissions) {
+    applyRoomPermissions(status.permissions)
   }
   if(typeof status.roomName === "string") {
     pageData.roomName = status.roomName
@@ -732,13 +835,13 @@ function applyRoomStatus(status: RoomStatus): RoomStatusClassification {
 }
 
 let lastShowOperateFailed = 0
-function showOperateFailed() {
+function showOperateFailed(content: string = "你没有权限执行这个操作。") {
   const now = time.getLocalTime()
   if(lastShowOperateFailed + 500 > now) return
   lastShowOperateFailed = now
   cui.showModal({
     title: "提示",
-    content: "房主已设置仅房主能操作播放器。不过，你仍然可以调整是否静音。",
+    content,
     showCancel: false,
   })
 }
@@ -792,7 +895,7 @@ function collectLatestStatus() {
   const _collect = () => {
     if(!player) return
     if(shouldSuppressLocalPlaybackReport()) return
-    if(!pageData.amIOwner && pageData.everyoneCanOperatePlayer === "N") return
+    if(!canControlPlayback()) return
 
     const currentTime = player.currentTime ?? 0
     let contentStamp = currentTime * 1000
@@ -845,6 +948,7 @@ function heartbeat() {
 
   const _newRoomStatus = (roRes: RoRes) => {
     pageData.participants = showParticipants(roRes.participants, guestId)
+    applyRoomMeta(roRes)
 
     const now = time.getLocalTime()
     const diff1 = now - lastOperateLocalStamp
@@ -874,7 +978,8 @@ function heartbeat() {
       queue: roRes.queue,
       currentIndex: roRes.currentIndex,
       currentItemId: roRes.currentItemId,
-      playMode: roRes.playMode
+      playMode: roRes.playMode,
+      permissions: roRes.permissions
     }
     if(roRes.everyoneCanOperatePlayer) {
       latestStatus.everyoneCanOperatePlayer = roRes.everyoneCanOperatePlayer
@@ -968,8 +1073,7 @@ async function resume() {
   let roRes = res.data as RoRes
   guestId = roRes.guestId ?? ""
   pageData.participants = showParticipants(roRes.participants, guestId)
-  pageData.roomName = roRes.roomName || ""
-  pageData.isPersistent = Boolean(roRes.isPersistent)
+  applyRoomMeta(roRes)
   latestStatus = {
     roomId: roRes.roomId,
     roomName: roRes.roomName,
@@ -983,7 +1087,8 @@ async function resume() {
     currentIndex: roRes.currentIndex,
     currentItemId: roRes.currentItemId,
     playMode: roRes.playMode,
-    everyoneCanOperatePlayer: roRes.everyoneCanOperatePlayer
+    everyoneCanOperatePlayer: roRes.everyoneCanOperatePlayer,
+    permissions: roRes.permissions
   }
   await receiveNewStatus("http")
   heartbeat()
@@ -1038,6 +1143,10 @@ function handleWebSocketMessage(msgRes: WsMsgRes): void {
     handlePlaylistImportProgressMessage(msgRes)
     return
   }
+  if(msgRes.responseType === "OPERATION_ERROR") {
+    handleOperationErrorMessage(msgRes)
+    return
+  }
   if(msgRes.responseType === "HEARTBEAT") {
     console.log("收到 ws 的 HEARTBEAT")
     console.log(" ")
@@ -1060,6 +1169,14 @@ function handleRoomInfoMessage(msgRes: WsMsgRes): void {
     return
   }
   pageData.roomName = info.roomName || ""
+  applyRoomPermissions(info.permissions, info.everyoneCanOperatePlayer)
+  applyOwnerGuestId(info.ownerGuestId)
+}
+
+function handleOperationErrorMessage(msgRes: WsMsgRes): void {
+  const error = msgRes.operationError
+  if(!error || error.roomId !== pageData.roomId) return
+  showOperateFailed(error.message || "你没有权限执行这个操作。")
 }
 
 function handlePlaylistImportProgressMessage(msgRes: WsMsgRes): void {

@@ -1,6 +1,8 @@
 import { roomRepo } from "./db"
 import { env } from "./config/env"
 import type { Room } from "./types"
+import { getOwnerGuestId, normalizeRoomConfig, resolveOwnerAfterParticipants } from "./permissionService"
+import { broadcaster } from "./websocket/broadcaster"
 
 export function startRoomClock(intervalMs: number): NodeJS.Timeout {
   const run = async () => {
@@ -38,7 +40,8 @@ async function handleRoomClock(): Promise<void> {
 
     if (participants.length === oldLen) continue
 
-    const patch: Partial<Room> = { participants }
+    const owner = resolveOwnerAfterParticipants(room, participants)
+    const patch: Partial<Room> = { participants, owner }
     if (participants.length === 0) {
       patch.emptyStamp = room.emptyStamp || lastHeartbeat || now
       if (room.playStatus === "PLAYING" && now - lastHeartbeat >= env.roomIdlePauseTimeoutMs) {
@@ -46,7 +49,17 @@ async function handleRoomClock(): Promise<void> {
       }
     }
 
-    roomRepo.update(room._id, patch)
+    const next = roomRepo.update(room._id, patch)
+    if (owner !== room.owner && next) {
+      const config = normalizeRoomConfig(next.config)
+      broadcaster.broadcastRoomInfo(room._id, {
+        roomId: room._id,
+        roomName: next.roomName,
+        ownerGuestId: getOwnerGuestId(next),
+        everyoneCanOperatePlayer: config.everyoneCanOperatePlayer,
+        permissions: config.permissions
+      })
+    }
   }
 }
 

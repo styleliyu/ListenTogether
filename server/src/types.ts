@@ -50,6 +50,7 @@ export interface ParticipantClient {
 export type SpeedRate = "0.8" | "1" | "1.2" | "1.5" | "1.7"
 export type PlayStatus = "PLAYING" | "PAUSED"
 export type PlayMode = "sequence" | "shuffle" | "single"
+export type RoomRole = "owner" | "member"
 
 export interface QueueItem {
   id: string
@@ -117,8 +118,15 @@ export interface UploadAudioData {
   failures: LocalImportFailure[]
 }
 
+export interface RoomPermissionConfig {
+  memberCanControlPlayback: boolean
+  memberCanManageQueue: boolean
+  memberCanImportPlaylist: boolean
+}
+
 export interface RoomConfig {
-  everyoneCanOperatePlayer: "Y" | "N"
+  everyoneCanOperatePlayer?: "Y" | "N"
+  permissions?: RoomPermissionConfig
 }
 
 export interface Room {
@@ -153,7 +161,10 @@ export interface RoRes {
   participants: ParticipantClient[]
   guestId?: string
   iamOwner?: "Y" | "N"
+  roomRole?: RoomRole
+  ownerGuestId?: string
   everyoneCanOperatePlayer?: "Y" | "N"
+  permissions?: RoomPermissionConfig
   queue?: RoomQueue
   currentIndex?: number
   currentItemId?: string
@@ -183,6 +194,7 @@ export interface RoomStatus {
   contentStamp: number
   operateStamp: number
   everyoneCanOperatePlayer?: "Y" | "N"
+  permissions?: RoomPermissionConfig
   content?: ContentData
   queue?: RoomQueue
   currentIndex?: number
@@ -191,14 +203,22 @@ export interface RoomStatus {
 }
 
 export interface ResToFe {
-  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO"
+  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR"
   roomStatus?: RoomStatus
   roomInfo?: {
     roomId: string
     roomName?: string
     deleted?: boolean
+    ownerGuestId?: string
+    everyoneCanOperatePlayer?: "Y" | "N"
+    permissions?: RoomPermissionConfig
   }
   playlistImportProgress?: PlaylistImportProgress
+  operationError?: {
+    roomId: string
+    operateType?: string
+    message: string
+  }
 }
 
 export interface ReqBase {

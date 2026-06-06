@@ -19,6 +19,8 @@ const {
   toContact, 
   toEditMyName, 
   onEveryoneCanOperatePlayerChange,
+  onRoomPermissionChange,
+  onTransferOwner,
   onQueueItemTap,
   onQueueAdvance,
   onQueueRemoveItem,
@@ -100,6 +102,22 @@ const showPlaylistImportPanel = computed(() => {
 const canCancelPlaylistImport = computed(() => {
   const status = pageData.playlistImportProgress?.status
   return status === "started" || status === "progress"
+})
+
+const canControlPlayback = computed(() => {
+  return pageData.amIOwner || pageData.permissions.memberCanControlPlayback
+})
+
+const canManageQueue = computed(() => {
+  return pageData.amIOwner || pageData.permissions.memberCanManageQueue
+})
+
+const canImportPlaylist = computed(() => {
+  return pageData.amIOwner || pageData.permissions.memberCanImportPlaylist
+})
+
+const canAppendQueueByLink = computed(() => {
+  return canManageQueue.value || canImportPlaylist.value
 })
 
 const showPlaylistImportDetails = computed(() => {
@@ -198,10 +216,10 @@ const onTapShowMore = () => {
             <p>{{ queueCurrentNumber }} / {{ queueTotalCount }}</p>
           </div>
           <div class="queue-actions">
-            <button @click="onAppendQueueByLink">添加歌曲/歌单</button>
-            <button @click="onQueueAdvance('prev')">上一首</button>
-            <button @click="onQueueAdvance('next')">下一首</button>
-            <button @click="onPlayModeChange">{{ playModeText }}</button>
+            <button :disabled="!canAppendQueueByLink" @click="onAppendQueueByLink">添加歌曲/歌单</button>
+            <button :disabled="!canControlPlayback" @click="onQueueAdvance('prev')">上一首</button>
+            <button :disabled="!canControlPlayback" @click="onQueueAdvance('next')">下一首</button>
+            <button :disabled="!canControlPlayback" @click="onPlayModeChange">{{ playModeText }}</button>
           </div>
         </div>
         <div v-if="showPlaylistImportPanel" class="playlist-import-panel">
@@ -259,7 +277,7 @@ const onTapShowMore = () => {
             class="queue-item"
             :class="{ 'queue-item_active': isQueueItemCurrent(index, item.id) }"
           >
-            <button class="queue-item__main" @click="onQueueItemTap(index)">
+            <button class="queue-item__main" :disabled="!canControlPlayback" @click="onQueueItemTap(index)">
               <span class="queue-index">{{ index + 1 }}</span>
               <span class="queue-title">{{ item.title }}</span>
               <span class="queue-artist">{{ item.artist }}</span>
@@ -269,14 +287,16 @@ const onTapShowMore = () => {
               <button
                 v-if="isQueueItemCurrent(index, item.id)"
                 class="queue-item__mini"
+                :disabled="!canManageQueue"
                 @click.stop="onQueueSkipCurrent"
               >跳过</button>
               <button
                 v-else
                 class="queue-item__mini"
+                :disabled="!canManageQueue"
                 @click.stop="onQueuePlayNext(item)"
               >下首播放</button>
-              <button class="queue-item__mini queue-item__mini_danger" @click.stop="onQueueRemoveItem(item)">删除</button>
+              <button class="queue-item__mini queue-item__mini_danger" :disabled="!canManageQueue" @click.stop="onQueueRemoveItem(item)">删除</button>
             </div>
           </div>
         </div>
@@ -286,7 +306,7 @@ const onTapShowMore = () => {
 
       <div v-if="pageData.participants?.length" class="room-listening">
         <div class="rl-title">正在听的有</div>
-        <div class="rl-mini-btn" v-if="pageData.amIOwner" @click="onTapManageBtn">
+        <div class="rl-mini-btn" @click="onTapManageBtn">
           <span>管理</span>
         </div>
       </div>
@@ -378,11 +398,16 @@ const onTapShowMore = () => {
   <RoomManagePopup 
     :show="showManagePopup" 
     :everyoneCanOperatePlayer="pageData.everyoneCanOperatePlayer"
+    :permissions="pageData.permissions"
     :roomName="pageData.roomName || ''"
     :isPersistent="Boolean(pageData.isPersistent)"
     :amIOwner="pageData.amIOwner"
+    :roomRole="pageData.roomRole"
+    :participants="pageData.participants"
     @tapmask="onTapManageMask"
     @everyoneCanOperatePlayerChange="onEveryoneCanOperatePlayerChange"
+    @permissionChange="onRoomPermissionChange"
+    @transferOwner="onTransferOwner"
     @roomNameChange="onRoomNameChange"
     @deleteRoom="onDeleteRoom"
   ></RoomManagePopup>
@@ -546,6 +571,11 @@ const onTapShowMore = () => {
       padding: 0 12px;
       cursor: pointer;
       font-size: 13px;
+
+      &:disabled {
+        cursor: default;
+        opacity: .48;
+      }
     }
   }
 
@@ -701,6 +731,11 @@ const onTapShowMore = () => {
     &:focus-visible {
       box-shadow: inset 0 0 0 2px var(--text-color);
     }
+
+    &:disabled {
+      cursor: default;
+      opacity: .55;
+    }
   }
 
   .queue-item__actions {
@@ -730,6 +765,11 @@ const onTapShowMore = () => {
 
     &:hover {
       background: var(--other-btn-hover);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: .48;
     }
   }
 

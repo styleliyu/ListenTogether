@@ -1,10 +1,13 @@
 import WebSocket from "ws"
-import type { PlaylistImportProgress, PtWebSocket, ResToFe, RoomStatus } from "../types"
+import type { PlaylistImportProgress, PtWebSocket, ResToFe, RoomPermissionConfig, RoomStatus } from "../types"
 
 interface RoomInfoPayload {
   roomId: string
   roomName?: string
   deleted?: boolean
+  ownerGuestId?: string
+  everyoneCanOperatePlayer?: "Y" | "N"
+  permissions?: RoomPermissionConfig
 }
 
 class WebSocketBroadcaster {

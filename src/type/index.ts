@@ -41,6 +41,13 @@ export interface ContentData {
 }
 
 export type PlayMode = "sequence" | "shuffle" | "single"
+export type RoomRole = "owner" | "member"
+
+export interface RoomPermissionConfig {
+  memberCanControlPlayback: boolean
+  memberCanManageQueue: boolean
+  memberCanImportPlaylist: boolean
+}
 
 export interface QueueItem {
   id: string
@@ -120,7 +127,10 @@ export interface RoRes {
   participants: Participant[]
   guestId?: string
   iamOwner?: "Y" | "N"
+  roomRole?: RoomRole
+  ownerGuestId?: string
   everyoneCanOperatePlayer?: "Y" | "N"
+  permissions?: RoomPermissionConfig
   queue?: RoomQueue
   currentIndex?: number
   currentItemId?: string

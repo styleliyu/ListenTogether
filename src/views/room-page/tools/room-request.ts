@@ -1,5 +1,5 @@
 import rq from "../../../request"
-import { ContentData, RequestRes, RoRes } from "../../../type"
+import { ContentData, RequestRes, RoRes, RoomPermissionConfig } from "../../../type"
 import api from "../../../request/api"
 
 const url = api.ROOM_OPERATE
@@ -43,6 +43,26 @@ export const request_set_room_name = async(roomId: string, nickName: string, roo
 
 export const request_delete_room = async(roomId: string, nickName: string): Promise<RequestRes<RoRes>> => {
   let param = { operateType: "DELETE_ROOM", roomId, nickName }
+  let res = await rq.request<RoRes>(url, param)
+  return res
+}
+
+export const request_set_room_permissions = async(
+  roomId: string,
+  nickName: string,
+  permissions: RoomPermissionConfig
+): Promise<RequestRes<RoRes>> => {
+  let param = { operateType: "SET_ROOM_PERMISSIONS", roomId, nickName, permissions }
+  let res = await rq.request<RoRes>(url, param)
+  return res
+}
+
+export const request_transfer_owner = async(
+  roomId: string,
+  nickName: string,
+  targetGuestId: string
+): Promise<RequestRes<RoRes>> => {
+  let param = { operateType: "TRANSFER_OWNER", roomId, nickName, targetGuestId }
   let res = await rq.request<RoRes>(url, param)
   return res
 }
