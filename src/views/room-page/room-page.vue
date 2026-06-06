@@ -9,6 +9,7 @@ import { computed, ref, toRef, watch } from 'vue';
 import { useTheme } from '../../hooks/useTheme';
 import { initManage } from './tools/init-manage';
 import RoomManagePopup from './room-manage-popup.vue';
+import RoomSharePopup from './room-share-popup.vue';
 import { useCccee } from "./tools/cccee"
 
 const { theme } = useTheme()
@@ -42,7 +43,6 @@ const {
   onTapBtn, 
   onTapBtn2,
   onTapLeave,
-  onTapShare,
   onTapEditMyName,
 } = initBtns(state, pageData, toHome, toContact, toEditMyName)
 const { 
@@ -54,6 +54,7 @@ const {
 useCccee(pageData)
 
 const alwaysFalse = ref(false)
+const showSharePopup = ref(false)
 const showPlaylistImportFailureDetails = ref(false)
 const hasLink = computed(() => {
   const linkUrl = pageData.content?.linkUrl
@@ -128,6 +129,15 @@ const playlistImportFailedTracks = computed(() => {
   return pageData.playlistImportProgress?.failedTracks || []
 })
 
+const roomShareUrl = computed(() => {
+  if(!pageData.roomId || typeof window === "undefined") return ""
+  const url = new URL(window.location.href)
+  url.pathname = `/room/${encodeURIComponent(pageData.roomId)}`
+  url.search = ""
+  url.hash = ""
+  return url.toString()
+})
+
 const showPlaylistImportFailureEntry = computed(() => {
   const progress = pageData.playlistImportProgress
   return Boolean((progress?.failedCount || 0) > 0 && playlistImportFailedTracks.value.length > 0)
@@ -174,6 +184,14 @@ const onTapShowMore = () => {
     return
   }
   if(pageData.showMoreBox) pageData.showMoreBox = false
+}
+
+const onTapShare = () => {
+  showSharePopup.value = true
+}
+
+const onCloseSharePopup = () => {
+  showSharePopup.value = false
 }
 
 </script>
@@ -411,6 +429,14 @@ const onTapShowMore = () => {
     @roomNameChange="onRoomNameChange"
     @deleteRoom="onDeleteRoom"
   ></RoomManagePopup>
+  <RoomSharePopup
+    :show="showSharePopup"
+    :shareUrl="roomShareUrl"
+    :roomName="pageData.roomName || ''"
+    :roomId="pageData.roomId"
+    :isPersistent="Boolean(pageData.isPersistent)"
+    @close="onCloseSharePopup"
+  ></RoomSharePopup>
   
 </template>
 
