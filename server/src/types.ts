@@ -202,7 +202,7 @@ export interface ResToFe {
 }
 
 export interface ReqBase {
-  operateType: "FIRST_SEND" | "SET_PLAYER" | "HEARTBEAT" | "SET_QUEUE_INDEX" | "ADVANCE_QUEUE" | "SET_PLAY_MODE" | "APPEND_QUEUE" | "IMPORT_PLAYLIST"
+  operateType: "FIRST_SEND" | "SET_PLAYER" | "HEARTBEAT" | "SET_QUEUE_INDEX" | "ADVANCE_QUEUE" | "SET_PLAY_MODE" | "APPEND_QUEUE" | "IMPORT_PLAYLIST" | "QUEUE_REMOVE_ITEM" | "QUEUE_SKIP_CURRENT" | "QUEUE_PLAY_NEXT"
   roomId: string
   "x-pt-local-id": string
   "x-pt-stamp": number
@@ -240,6 +240,20 @@ export interface ReqAppendQueue extends ReqBase {
 export interface ReqImportPlaylist extends ReqBase {
   operateType: "IMPORT_PLAYLIST"
   link: string
+}
+
+export interface ReqQueueRemoveItem extends ReqBase {
+  operateType: "QUEUE_REMOVE_ITEM"
+  itemId: string
+}
+
+export interface ReqQueueSkipCurrent extends ReqBase {
+  operateType: "QUEUE_SKIP_CURRENT"
+}
+
+export interface ReqQueuePlayNext extends ReqBase {
+  operateType: "QUEUE_PLAY_NEXT"
+  itemId: string
 }
 
 export interface RequestContext {

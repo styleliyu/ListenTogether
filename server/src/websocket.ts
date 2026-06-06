@@ -4,7 +4,7 @@ import { roomRepo } from "./db"
 import { resolveQueueItemContent } from "./music/musicAdapter"
 import { getPlaylistImportProgress, importPlaylistByLink, setPlaylistImportBroadcaster } from "./playlistImport"
 import { buildPlaybackUpdate, canOperatePlayer, shouldIgnoreRapidSameOperator } from "./playbackService"
-import { buildQueueRoomStatus, canOperateQueue, contentToQueueItem, getNextQueueIndex, isPlayMode, normalizeQueue, reconcileQueueCurrent, sanitizeQueueItems } from "./queueService"
+import { buildQueueRoomStatus, canOperateQueue, contentToQueueItem, getNextQueueIndex, getSkipQueueIndex, isPlayMode, moveQueueItemAfterCurrent, normalizeQueue, reconcileQueueCurrent, removeQueueItem, sanitizeQueueItems } from "./queueService"
 import { broadcaster } from "./websocket/broadcaster"
 import type {
   ContentData,
@@ -15,6 +15,9 @@ import type {
   ReqAdvanceQueue,
   ReqBase,
   ReqOperatePlayer,
+  ReqQueuePlayNext,
+  ReqQueueRemoveItem,
+  ReqQueueSkipCurrent,
   ReqSetPlayMode,
   ReqSetQueueIndex,
   Room,
@@ -94,6 +97,9 @@ async function handleMessage(socket: PtWebSocket, data: unknown): Promise<void> 
   else if (req.operateType === "SET_PLAY_MODE") await handleSetPlayMode(socket, req as ReqSetPlayMode)
   else if (req.operateType === "APPEND_QUEUE") await handleAppendQueue(socket, req as ReqAppendQueue)
   else if (req.operateType === "IMPORT_PLAYLIST") await handleImportPlaylist(socket, req as ReqImportPlaylist)
+  else if (req.operateType === "QUEUE_REMOVE_ITEM") await handleQueueRemoveItem(socket, req as ReqQueueRemoveItem)
+  else if (req.operateType === "QUEUE_SKIP_CURRENT") await handleQueueSkipCurrent(socket, req as ReqQueueSkipCurrent)
+  else if (req.operateType === "QUEUE_PLAY_NEXT") await handleQueuePlayNext(socket, req as ReqQueuePlayNext)
   else if (req.operateType === "HEARTBEAT") handleHeartbeat(socket, req)
 }
 
@@ -233,7 +239,84 @@ async function handleImportPlaylist(socket: PtWebSocket, req: ReqImportPlaylist)
   })
 }
 
-async function pauseQueueAtEnd(roomId: string, room: Room, req: ReqAdvanceQueue): Promise<void> {
+async function handleQueueRemoveItem(socket: PtWebSocket, req: ReqQueueRemoveItem): Promise<void> {
+  const room = roomRepo.get(req.roomId)
+  const baseQueue = normalizeQueue(room?.queue)
+  if (!room || !baseQueue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
+  if (!guestId) return
+
+  const result = removeQueueItem(baseQueue, req.itemId)
+  if (!result) return
+
+  if (!result.queue.items.length) {
+    roomRepo.update(req.roomId, {
+      queue: result.queue,
+      playStatus: "PAUSED",
+      contentStamp: 0,
+      operateStamp: req["x-pt-stamp"],
+      operator: guestId
+    })
+    broadcaster.broadcastRoomStatus(req.roomId, {
+      roomId: req.roomId,
+      content: room.content,
+      playStatus: "PAUSED",
+      speedRate: room.speedRate,
+      contentStamp: 0,
+      operateStamp: req["x-pt-stamp"],
+      operator: guestId,
+      queue: result.queue,
+      currentIndex: result.queue.currentIndex,
+      currentItemId: result.queue.currentItemId,
+      playMode: result.queue.playMode
+    })
+    return
+  }
+
+  if (result.removedCurrent) {
+    await switchQueueIndex(req.roomId, { ...room, queue: result.queue }, result.queue.currentIndex, req["x-pt-stamp"], req["x-pt-local-id"], room.playStatus)
+    return
+  }
+
+  roomRepo.update(req.roomId, {
+    queue: result.queue,
+    operator: guestId
+  })
+  broadcaster.broadcastRoomStatus(req.roomId, buildQueueRoomStatus(req.roomId, room, result.queue, guestId))
+}
+
+async function handleQueueSkipCurrent(socket: PtWebSocket, req: ReqQueueSkipCurrent): Promise<void> {
+  const room = roomRepo.get(req.roomId)
+  const queue = normalizeQueue(room?.queue)
+  if (!room || !queue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+
+  const nextIndex = getSkipQueueIndex(queue)
+  if (nextIndex < 0) {
+    await pauseQueueAtEnd(req.roomId, { ...room, queue }, req)
+    return
+  }
+
+  await switchQueueIndex(req.roomId, { ...room, queue }, nextIndex, req["x-pt-stamp"], req["x-pt-local-id"], room.playStatus)
+}
+
+async function handleQueuePlayNext(socket: PtWebSocket, req: ReqQueuePlayNext): Promise<void> {
+  const room = roomRepo.get(req.roomId)
+  const baseQueue = normalizeQueue(room?.queue)
+  if (!room || !baseQueue || !canOperateQueue(room, req["x-pt-local-id"], defaultRoomCfg)) return
+  const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
+  if (!guestId) return
+
+  const queue = moveQueueItemAfterCurrent(baseQueue, req.itemId)
+  if (!queue) return
+
+  roomRepo.update(req.roomId, {
+    queue,
+    operator: guestId
+  })
+  broadcaster.broadcastRoomStatus(req.roomId, buildQueueRoomStatus(req.roomId, room, queue, guestId))
+}
+
+async function pauseQueueAtEnd(roomId: string, room: Room, req: ReqAdvanceQueue | ReqQueueSkipCurrent): Promise<void> {
   const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
   if (!guestId) return
   roomRepo.update(roomId, {
@@ -331,10 +414,10 @@ function queueItemResolveKey(item: QueueItem): string {
   return `${item.sourceType}:${item.resourceId || item.linkUrl || item.id}`
 }
 
-function checkReqObject(data: ReqBase | ReqOperatePlayer | ReqSetQueueIndex | ReqAdvanceQueue | ReqSetPlayMode | ReqAppendQueue | ReqImportPlaylist): boolean {
+function checkReqObject(data: ReqBase | ReqOperatePlayer | ReqSetQueueIndex | ReqAdvanceQueue | ReqSetPlayMode | ReqAppendQueue | ReqImportPlaylist | ReqQueueRemoveItem | ReqQueueSkipCurrent | ReqQueuePlayNext): boolean {
   if (!data) return false
   if (!data.operateType || !data.roomId || !data["x-pt-local-id"] || !data["x-pt-stamp"]) return false
-  if (!["FIRST_SEND", "SET_PLAYER", "HEARTBEAT", "SET_QUEUE_INDEX", "ADVANCE_QUEUE", "SET_PLAY_MODE", "APPEND_QUEUE", "IMPORT_PLAYLIST"].includes(data.operateType)) return false
+  if (!["FIRST_SEND", "SET_PLAYER", "HEARTBEAT", "SET_QUEUE_INDEX", "ADVANCE_QUEUE", "SET_PLAY_MODE", "APPEND_QUEUE", "IMPORT_PLAYLIST", "QUEUE_REMOVE_ITEM", "QUEUE_SKIP_CURRENT", "QUEUE_PLAY_NEXT"].includes(data.operateType)) return false
 
   if (data.operateType === "SET_PLAYER") {
     const req = data as ReqOperatePlayer
@@ -368,6 +451,11 @@ function checkReqObject(data: ReqBase | ReqOperatePlayer | ReqSetQueueIndex | Re
   if (data.operateType === "IMPORT_PLAYLIST") {
     const req = data as ReqImportPlaylist
     if (typeof req.link !== "string" || !/^https?:\/\//i.test(req.link)) return false
+  }
+
+  if (data.operateType === "QUEUE_REMOVE_ITEM" || data.operateType === "QUEUE_PLAY_NEXT") {
+    const req = data as ReqQueueRemoveItem | ReqQueuePlayNext
+    if (typeof req.itemId !== "string" || !req.itemId.trim()) return false
   }
 
   return true

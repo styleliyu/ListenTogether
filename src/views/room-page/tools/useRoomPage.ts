@@ -85,6 +85,7 @@ let lastNewStatusFromWsStamp = 0    // 涓婁竴娆℃敹鍒?web-socket NEW_STAT
 let lastHeartbeatStamp = 0          // 涓婁竴娆″績璺崇殑鏃堕棿鎴?
 let lastReConnectWs = 0
 let suppressLocalPlaybackReportUntil = 0
+let queueActionLockUntil = 0
 
 // 鏄惁涓鸿繙绔皟鏁存挱鏀惧櫒鐘舵€侊紝濡傛灉鏄紝鍒欏湪鐩戝惉 player 鍚勫洖璋冩椂涓嶅線涓嬫墽琛?
 let isRemoteSetSeek = false
@@ -168,6 +169,50 @@ const onQueueAdvance = (direction: "next" | "prev") => {
     return
   }
   sendAdvanceQueue(direction)
+}
+
+const onQueueRemoveItem = (item: QueueItem) => {
+  if(!canOperatePlayer()) {
+    showOperateFailed()
+    return
+  }
+  if(!item?.id || !canSendQueueAction()) return
+  sendToWebSocket(ws, {
+    operateType: "QUEUE_REMOVE_ITEM",
+    roomId: pageData.roomId,
+    "x-pt-local-id": localId,
+    "x-pt-stamp": time.getTime(),
+    itemId: item.id
+  })
+}
+
+const onQueueSkipCurrent = () => {
+  if(!canOperatePlayer()) {
+    showOperateFailed()
+    return
+  }
+  if(!pageData.queue?.items?.length || !canSendQueueAction()) return
+  sendToWebSocket(ws, {
+    operateType: "QUEUE_SKIP_CURRENT",
+    roomId: pageData.roomId,
+    "x-pt-local-id": localId,
+    "x-pt-stamp": time.getTime()
+  })
+}
+
+const onQueuePlayNext = (item: QueueItem) => {
+  if(!canOperatePlayer()) {
+    showOperateFailed()
+    return
+  }
+  if(!item?.id || !canSendQueueAction()) return
+  sendToWebSocket(ws, {
+    operateType: "QUEUE_PLAY_NEXT",
+    roomId: pageData.roomId,
+    "x-pt-local-id": localId,
+    "x-pt-stamp": time.getTime(),
+    itemId: item.id
+  })
 }
 
 const onPlayModeChange = () => {
@@ -328,6 +373,9 @@ export const useRoomPage = () => {
     onEveryoneCanOperatePlayerChange,
     onQueueItemTap,
     onQueueAdvance,
+    onQueueRemoveItem,
+    onQueueSkipCurrent,
+    onQueuePlayNext,
     onPlayModeChange,
     onAppendQueueByLink,
     onCancelPlaylistImport,
@@ -566,6 +614,13 @@ function sendImportPlaylist(link: string) {
     "x-pt-stamp": time.getTime(),
     link
   })
+}
+
+function canSendQueueAction(): boolean {
+  const now = time.getLocalTime()
+  if(queueActionLockUntil > now) return false
+  queueActionLockUntil = now + 350
+  return true
 }
 
 function suppressLocalPlaybackReport(ms: number = STALE_PLAYBACK_REPORT_SUPPRESS_MS): void {

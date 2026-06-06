@@ -25,6 +25,18 @@ export function getNextQueueIndex(queue: RoomQueue, direction: "next" | "prev" |
   return next
 }
 
+export function getSkipQueueIndex(queue: RoomQueue): number {
+  const normalized = normalizeQueue(queue)
+  if (!normalized || normalized.items.length <= 1) return -1
+  if (normalized.playMode === "shuffle") {
+    let next = normalized.currentIndex
+    for (let i = 0; i < 8 && next === normalized.currentIndex; i++) next = Math.floor(Math.random() * normalized.items.length)
+    return next === normalized.currentIndex ? (normalized.currentIndex + 1) % normalized.items.length : next
+  }
+  const next = normalized.currentIndex + 1
+  return next < normalized.items.length ? next : -1
+}
+
 export function normalizeQueue(queue: RoomQueue | undefined): RoomQueue | undefined {
   if (!queue) return undefined
   const items = Array.isArray(queue.items) ? queue.items : []
@@ -61,6 +73,61 @@ export function reconcileQueueCurrent(previous: RoomQueue | undefined, next: Roo
   const stableId = previousQueue?.currentItemId || previousQueue?.items[previousQueue.currentIndex]?.id
   if (!stableId) return nextQueue
   return normalizeQueue({ ...nextQueue, currentItemId: stableId }) || nextQueue
+}
+
+export function removeQueueItem(queue: RoomQueue, itemId: string): { queue: RoomQueue; removedCurrent: boolean; removedIndex: number } | undefined {
+  const normalized = normalizeQueue(queue)
+  if (!normalized) return undefined
+  const removedIndex = normalized.items.findIndex(item => item.id === itemId)
+  if (removedIndex < 0) return undefined
+
+  const removed = normalized.items[removedIndex]
+  const removedCurrent = removed.id === normalized.currentItemId || removedIndex === normalized.currentIndex
+  const items = normalized.items.filter(item => item.id !== itemId)
+
+  if (!items.length) {
+    return {
+      queue: { items: [], currentIndex: 0, playMode: normalized.playMode },
+      removedCurrent,
+      removedIndex
+    }
+  }
+
+  if (!removedCurrent) {
+    return {
+      queue: normalizeQueue({ ...normalized, items }) as RoomQueue,
+      removedCurrent,
+      removedIndex
+    }
+  }
+
+  const currentIndex = Math.min(removedIndex, items.length - 1)
+  return {
+    queue: normalizeQueue({ ...normalized, items, currentIndex, currentItemId: items[currentIndex]?.id }) as RoomQueue,
+    removedCurrent,
+    removedIndex
+  }
+}
+
+export function moveQueueItemAfterCurrent(queue: RoomQueue, itemId: string): RoomQueue | undefined {
+  const normalized = normalizeQueue(queue)
+  if (!normalized || normalized.items.length < 2) return normalized
+  if (itemId === normalized.currentItemId) return normalized
+
+  const itemIndex = normalized.items.findIndex(item => item.id === itemId)
+  if (itemIndex < 0) return undefined
+
+  const moving = normalized.items[itemIndex]
+  const withoutMoving = normalized.items.filter(item => item.id !== itemId)
+  const currentIndex = withoutMoving.findIndex(item => item.id === normalized.currentItemId)
+  if (currentIndex < 0) return normalized
+
+  const items = [
+    ...withoutMoving.slice(0, currentIndex + 1),
+    moving,
+    ...withoutMoving.slice(currentIndex + 1)
+  ]
+  return reconcileQueueCurrent(normalized, { ...normalized, items })
 }
 
 export function sanitizeQueueItems(items: QueueItem[] | undefined): QueueItem[] {

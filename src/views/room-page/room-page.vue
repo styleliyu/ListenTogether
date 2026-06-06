@@ -21,6 +21,9 @@ const {
   onEveryoneCanOperatePlayerChange,
   onQueueItemTap,
   onQueueAdvance,
+  onQueueRemoveItem,
+  onQueueSkipCurrent,
+  onQueuePlayNext,
   onPlayModeChange,
   onAppendQueueByLink,
   onCancelPlaylistImport,
@@ -142,6 +145,11 @@ const queueTotalCount = computed(() => {
   return pageData.queue?.items?.length || 0
 })
 
+const isQueueItemCurrent = (index: number, itemId: string) => {
+  if(pageData.queue?.currentItemId) return pageData.queue.currentItemId === itemId
+  return index === pageData.queue?.currentIndex
+}
+
 const onTapShowMore = () => {
   if(hasLink.value) {
     window.open(pageData.content?.linkUrl as string, "_blank")
@@ -245,17 +253,32 @@ const onTapShowMore = () => {
           </div>
         </div>
         <div class="queue-list">
-          <button
+          <div
             v-for="(item, index) in pageData.queue.items"
             :key="item.id + '-' + index"
             class="queue-item"
-            :class="{ 'queue-item_active': index === pageData.queue.currentIndex }"
-            @click="onQueueItemTap(index)"
+            :class="{ 'queue-item_active': isQueueItemCurrent(index, item.id) }"
           >
-            <span class="queue-index">{{ index + 1 }}</span>
-            <span class="queue-title">{{ item.title }}</span>
-            <span class="queue-artist">{{ item.artist }}</span>
-          </button>
+            <button class="queue-item__main" @click="onQueueItemTap(index)">
+              <span class="queue-index">{{ index + 1 }}</span>
+              <span class="queue-title">{{ item.title }}</span>
+              <span class="queue-artist">{{ item.artist }}</span>
+            </button>
+            <div class="queue-item__actions">
+              <span v-if="isQueueItemCurrent(index, item.id)" class="queue-item__badge">当前播放</span>
+              <button
+                v-if="isQueueItemCurrent(index, item.id)"
+                class="queue-item__mini"
+                @click.stop="onQueueSkipCurrent"
+              >跳过</button>
+              <button
+                v-else
+                class="queue-item__mini"
+                @click.stop="onQueuePlayNext(item)"
+              >下首播放</button>
+              <button class="queue-item__mini queue-item__mini_danger" @click.stop="onQueueRemoveItem(item)">删除</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -644,27 +667,74 @@ const onTapShowMore = () => {
   .queue-item {
     width: 100%;
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) minmax(0, 140px);
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
     align-items: center;
-    min-height: 42px;
-    border: 0;
     border-radius: 6px;
     background: transparent;
     color: var(--desc-color);
     text-align: left;
-    cursor: pointer;
-    padding: 0 10px;
+    padding: 4px 8px;
     font-size: 14px;
-    outline: none;
 
     &:hover {
       background: var(--card-color);
     }
+  }
+
+  .queue-item__main {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) minmax(0, 140px);
+    gap: 12px;
+    align-items: center;
+    min-height: 38px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    outline: none;
 
     &:focus-visible {
       box-shadow: inset 0 0 0 2px var(--text-color);
     }
+  }
+
+  .queue-item__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .queue-item__badge {
+    color: var(--note-color);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .queue-item__mini {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 6px;
+    background: var(--other-btn-bg);
+    color: var(--other-btn-text);
+    min-height: 28px;
+    padding: 0 9px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+
+    &:hover {
+      background: var(--other-btn-hover);
+    }
+  }
+
+  .queue-item__mini_danger {
+    color: var(--desc-color);
   }
 
   .queue-item_active {
@@ -815,7 +885,17 @@ const onTapShowMore = () => {
     }
 
     .queue-item {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px;
+    }
+
+    .queue-item__main {
       grid-template-columns: 30px minmax(0, 1fr);
+    }
+
+    .queue-item__actions {
+      justify-content: flex-start;
+      padding-left: 30px;
     }
 
     .queue-artist {
