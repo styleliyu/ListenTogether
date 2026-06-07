@@ -1,0 +1,32 @@
+.join-container h1 {
+  margin-block-start: 0;
+  font-size: 38px;
+  line-height: 50px;
+  color: var(--text-color);
+  letter-spacing: 0;
+  margin-bottom: 50px;
+}
+
+.join-container input {
+  font-size: 36px;
+  line-height: 50px;
+  color: var(--desc-color);
+  border: 0;
+  outline: none;
+  text-align: center;
+  width: 100%;
+}
+
+.join-container input::placeholder {
+  color: var(--note-color);
+}
+
+.join-main-btn {
+  margin-bottom: 20px;
+}
+
+@media screen and (max-width: 300px) {
+  .join-container input {
+    font-size: 30px;
+  }
+}

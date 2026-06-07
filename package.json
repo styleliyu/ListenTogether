@@ -1,12 +1,12 @@
 {
   "name": "podcast-together",
   "version": "0.9.4",
-  "description": "一个基于 vite + vue + vue-router + ts 的全栈项目，让你跟好友一起实时同步听音乐、播客和本地音频。",
+  "description": "一个基于 Vite + React + TypeScript 的全栈项目，让你跟好友一起实时同步听音乐、播客和本地音频。",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "dev-force": "vite --force",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "start": "npx http-server -P http://127.0.0.1:${PORT} ./dist"
   },
@@ -22,25 +22,27 @@
     "metaflac-js": "^1.0.5",
     "music-metadata-browser": "2.2.7",
     "nanoid": "^4.0.2",
-    "pinia": "^2.1.6",
     "qrcode": "^1.5.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.23.1",
     "shikwasa2": "^2.3.0",
     "threads": "^1.6.5",
     "vconsole": "^3.15.1",
-    "vue": "^3.3.4",
-    "vue-router": "^4.2.4",
-    "weixin-js-sdk-ts": "^1.6.1"
+    "weixin-js-sdk-ts": "^1.6.1",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/node": "^18.16.16",
     "@types/qrcode": "^1.5.6",
-    "@vitejs/plugin-vue": "^4.3.3",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.3.1",
     "sass": "^1.66.1",
     "typescript": "^5.0.4",
     "user-agent-data-types": "^0.3.1",
     "vite": "^4.4.9",
-    "vite-plugin-pwa": "^0.16.4",
-    "vue-tsc": "^1.8.8"
+    "vite-plugin-pwa": "^0.16.4"
   },
   "author": "yenche123 <tsuiyenche@outlook.com> (https://github.com/yenche123)",
   "contributors": [],
@@ -49,7 +51,7 @@
     "音乐",
     "podcast",
     "播客",
-    "vue",
+    "react",
     "web-socket",
     "shikwasa",
     "typescript",
