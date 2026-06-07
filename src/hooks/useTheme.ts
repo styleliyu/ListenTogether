@@ -1,19 +1,19 @@
-// 主题状态变动类
-import { ref } from "vue"
+import { useEffect, useState } from "react"
 
-export type ThemeType = "light" | "dark"      // 用于传给布局层的主题
-export type UserTheme = ThemeType | "system"  // 用户选择（或尚未选择）的主题
+export type ThemeType = "light" | "dark"
 
-const m = window.matchMedia('(prefers-color-scheme: dark)')
+const media = window.matchMedia("(prefers-color-scheme: dark)")
 
-const isDarkWhenInit: boolean = m.matches
-const theme = ref<ThemeType>(isDarkWhenInit ? "dark" : "light")
+export function useTheme(): ThemeType {
+  const [theme, setTheme] = useState<ThemeType>(media.matches ? "dark" : "light")
 
-export const useTheme = () => {
-  const setTheme = (newTheme: ThemeType) => {
-    if(newTheme === theme.value) return
-    theme.value = newTheme
-  }
+  useEffect(() => {
+    const onChange = (event: MediaQueryListEvent) => {
+      setTheme(event.matches ? "dark" : "light")
+    }
+    media.addEventListener("change", onChange)
+    return () => media.removeEventListener("change", onChange)
+  }, [])
 
-  return { theme, setTheme }
+  return theme
 }

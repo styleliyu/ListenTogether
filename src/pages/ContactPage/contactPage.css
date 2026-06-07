@@ -1,0 +1,28 @@
+.contact-container h1 {
+  color: var(--text-color);
+  font-size: 34px;
+  line-height: 44px;
+  margin: 0 0 32px;
+}
+
+.contact-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 24px;
+  border-radius: 8px;
+  background: var(--card-color);
+  color: var(--desc-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-card a {
+  color: var(--text-color);
+  user-select: text;
+}
+
+.contact-actions {
+  width: 100%;
+  margin-top: 40px;
+}

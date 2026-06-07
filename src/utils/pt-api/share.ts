@@ -26,6 +26,6 @@ export const share = async (data?: ShareData): Promise<boolean> => {
 
 export const canShare = (data: ShareData): boolean => {
   if(!navigator.share) return false
-  if(!navigator.canShare) return false
+  if(!navigator.canShare) return true
   return navigator.canShare(data)
 }
