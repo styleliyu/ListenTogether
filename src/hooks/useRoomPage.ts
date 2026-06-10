@@ -78,8 +78,8 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     showOperateFailed,
   } = useRoomPermissions(getPageData)
 
-  const sendWs = useCallback((obj: Record<string, any>) => {
-    websocket.send({
+  const sendWs = useCallback((obj: Record<string, any>): boolean => {
+    return websocket.send({
       roomId: store.getState().pageData.roomId,
       "x-pt-local-id": localIdRef.current,
       "x-pt-stamp": time.getTime(),
@@ -257,9 +257,22 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
       if (progress.status === "failed") window.alert(progress.message)
       return
     }
+    if (msgRes.responseType === "CHAT_HISTORY") {
+      store.getState().setChatHistory(msgRes.chatMessages || [])
+      return
+    }
+    if (msgRes.responseType === "CHAT_MESSAGE") {
+      if (!msgRes.chatMessage) return
+      store.getState().appendChatMessage(msgRes.chatMessage)
+      return
+    }
     if (msgRes.responseType === "OPERATION_ERROR") {
       const error = msgRes.operationError
       if (!error || error.roomId !== store.getState().pageData.roomId) return
+      if (error.operateType === "CHAT_SEND") {
+        store.getState().setChatError(error.message || "消息发送失败")
+        return
+      }
       showOperateFailed(error.message || "你没有权限执行这个操作。")
     }
   }, [receiveNewStatus, sendWs, showOperateFailed, store])
@@ -496,6 +509,16 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     store.getState().patchPageData({ playlistImportCollapsed: !collapsed })
   }, [store])
 
+  const onSendChatMessage = useCallback((content: string): boolean => {
+    const sent = sendWs({ operateType: "CHAT_SEND", content })
+    if (!sent) store.getState().setChatError("连接未就绪，请稍后再试")
+    return sent
+  }, [sendWs, store])
+
+  const onClearChatError = useCallback(() => {
+    store.getState().setChatError("")
+  }, [store])
+
   const onRoomPermissionChange = useCallback(async (key: "memberCanControlPlayback" | "memberCanManageQueue" | "memberCanImportPlaylist", checked: boolean) => {
     const data = store.getState().pageData
     if (!data.amIOwner) return
@@ -571,6 +594,8 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     onTransferOwner,
     onRoomNameChange,
     onDeleteRoom,
+    onSendChatMessage,
+    onClearChatError,
   }), [
     navigate,
     onAppendQueueByLink,
@@ -584,6 +609,8 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     onQueueSkipCurrent,
     onRoomNameChange,
     onRoomPermissionChange,
+    onSendChatMessage,
+    onClearChatError,
     onTogglePlaylistImportPanel,
     onTransferOwner,
     pageData,

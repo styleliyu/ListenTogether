@@ -37,7 +37,7 @@ export function useRoomWebSocket() {
 
   const send = useCallback((obj: Record<string, any>): boolean => {
     const ws = wsRef.current
-    if (!ws) return false
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false
     try {
       ws.send(JSON.stringify(obj))
       return true

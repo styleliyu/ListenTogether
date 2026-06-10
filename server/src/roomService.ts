@@ -15,6 +15,7 @@ import { startPlaylistImport, stopPlaylistImportForRoom } from "./playlistImport
 import { env } from "./config/env"
 import { broadcaster } from "./websocket/broadcaster"
 import { normalizeQueue } from "./queueService"
+import { clearRoomChatHistory } from "./chatService"
 import {
   DEFAULT_ROOM_CONFIG,
   assertRoomPermission,
@@ -97,11 +98,15 @@ async function handleDeleteRoom(body: CommonBody): Promise<RequestRes<RoRes>> {
   const room = roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
-  if (room.oState === "DELETED") return { code: "0000" }
+  if (room.oState === "DELETED") {
+    clearRoomChatHistory(roomId)
+    return { code: "0000" }
+  }
   if (room.owner !== clientId) return { code: "E4003" }
   if (!room.isPersistent) return { code: "E4000", showMsg: "只有常驻房间可以主动删除" }
 
   stopPlaylistImportForRoom(roomId)
+  clearRoomChatHistory(roomId)
   roomRepo.update(roomId, {
     oState: "DELETED",
     playStatus: "PAUSED",

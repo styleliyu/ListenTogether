@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import type {
+  ChatMessage,
   ContentData,
   PageData,
   PageParticipant,
@@ -34,6 +35,8 @@ const initialPageData: PageData = {
   playlistImportProgress: undefined,
   playlistImportCollapsed: false,
   cancellingPlaylistImport: false,
+  chatMessages: [],
+  chatError: "",
 }
 
 interface RoomStoreState {
@@ -48,6 +51,9 @@ interface RoomStoreState {
   applyOwnerGuestId: (ownerGuestId?: string, guestId?: string) => void
   applyRoomMeta: (roRes?: Partial<RoRes>, guestId?: string) => void
   updatePlaylistImportProgress: (progress: PlaylistImportProgress, touched: boolean) => void
+  setChatHistory: (messages: ChatMessage[]) => void
+  appendChatMessage: (message: ChatMessage) => void
+  setChatError: (message?: string) => void
   reset: () => void
 }
 
@@ -128,5 +134,28 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       },
     }))
   },
+  setChatHistory: (messages) => set(({ pageData }) => ({
+    pageData: {
+      ...pageData,
+      chatMessages: messages.filter(message => message.roomId === pageData.roomId).slice(-50),
+    },
+  })),
+  appendChatMessage: (message) => set(({ pageData }) => {
+    if (message.roomId !== pageData.roomId) return { pageData }
+    if (pageData.chatMessages.some(item => item.id === message.id)) return { pageData }
+    return {
+      pageData: {
+        ...pageData,
+        chatMessages: [...pageData.chatMessages, message].slice(-50),
+        chatError: "",
+      },
+    }
+  }),
+  setChatError: (message = "") => set(({ pageData }) => ({
+    pageData: {
+      ...pageData,
+      chatError: message,
+    },
+  })),
   reset: () => set({ pageData: { ...initialPageData, permissions: { ...DEFAULT_ROOM_PERMISSIONS } } }),
 }))

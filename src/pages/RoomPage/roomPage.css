@@ -333,6 +333,168 @@
   font-size: 13px;
 }
 
+.room-chat {
+  width: 100%;
+  margin-top: 24px;
+  border-top: 1px solid var(--card-color);
+  border-bottom: 1px solid var(--card-color);
+  padding: 18px 0;
+}
+
+.room-chat__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.room-chat__head h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  color: var(--text-color);
+}
+
+.room-chat__head p {
+  margin: 4px 0 0;
+  color: var(--note-color);
+  font-size: 13px;
+}
+
+.room-chat__messages {
+  margin-top: 14px;
+  max-height: 280px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.room-chat__empty {
+  min-height: 72px;
+  border-radius: 8px;
+  background: var(--card-color);
+  color: var(--note-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.room-chat__message {
+  width: fit-content;
+  max-width: 84%;
+}
+
+.room-chat__message_mine {
+  align-self: flex-end;
+}
+
+.room-chat__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--note-color);
+  font-size: 12px;
+  line-height: 18px;
+  margin-bottom: 3px;
+}
+
+.room-chat__message_mine .room-chat__meta {
+  justify-content: flex-end;
+}
+
+.room-chat__sender {
+  color: var(--desc-color);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-chat__bubble {
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--card-color);
+  color: var(--desc-color);
+  font-size: 14px;
+  line-height: 21px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.room-chat__message_mine .room-chat__bubble {
+  background: var(--main-btn-bg);
+  color: var(--main-btn-text);
+}
+
+.room-chat__form {
+  margin-top: 14px;
+}
+
+.room-chat__form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 82px;
+  resize: vertical;
+  border: 1px solid var(--card-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--card-color);
+  color: var(--text-color);
+  font-size: 14px;
+  line-height: 21px;
+  outline: none;
+}
+
+.room-chat__form textarea:focus {
+  border-color: var(--note-color);
+}
+
+.room-chat__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.room-chat__count {
+  color: var(--note-color);
+  font-size: 12px;
+}
+
+.room-chat__count_error,
+.room-chat__error {
+  color: #b3261e;
+}
+
+.room-chat__footer button {
+  border: 0;
+  border-radius: 6px;
+  background: var(--main-btn-bg);
+  color: var(--main-btn-text);
+  height: 32px;
+  padding: 0 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.room-chat__footer button:disabled {
+  cursor: default;
+  opacity: .48;
+}
+
+.room-chat__error {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
 .room-listening {
   margin: 0 0 20px;
   width: 100%;
@@ -838,6 +1000,14 @@
 
   .queue-artist {
     display: none;
+  }
+
+  .room-chat__message {
+    max-width: 92%;
+  }
+
+  .room-chat__sender {
+    max-width: 120px;
   }
 
   .rsp-actions {

@@ -76,6 +76,15 @@ export interface PendingPlaylistImport {
   importedItemIds?: string[]
 }
 
+export interface ChatMessage {
+  id: string
+  roomId: string
+  senderId: string
+  senderName?: string
+  content: string
+  createdAt: number
+}
+
 export interface PlaylistImportProgress {
   status: "started" | "progress" | "completed" | "cancelled" | "failed"
   roomId: string
@@ -203,7 +212,7 @@ export interface RoomStatus {
 }
 
 export interface ResToFe {
-  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR"
+  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR" | "CHAT_MESSAGE" | "CHAT_HISTORY"
   roomStatus?: RoomStatus
   roomInfo?: {
     roomId: string
@@ -214,6 +223,8 @@ export interface ResToFe {
     permissions?: RoomPermissionConfig
   }
   playlistImportProgress?: PlaylistImportProgress
+  chatMessage?: ChatMessage
+  chatMessages?: ChatMessage[]
   operationError?: {
     roomId: string
     operateType?: string
@@ -222,7 +233,7 @@ export interface ResToFe {
 }
 
 export interface ReqBase {
-  operateType: "FIRST_SEND" | "SET_PLAYER" | "HEARTBEAT" | "SET_QUEUE_INDEX" | "ADVANCE_QUEUE" | "SET_PLAY_MODE" | "APPEND_QUEUE" | "IMPORT_PLAYLIST" | "QUEUE_REMOVE_ITEM" | "QUEUE_SKIP_CURRENT" | "QUEUE_PLAY_NEXT"
+  operateType: "FIRST_SEND" | "SET_PLAYER" | "HEARTBEAT" | "SET_QUEUE_INDEX" | "ADVANCE_QUEUE" | "SET_PLAY_MODE" | "APPEND_QUEUE" | "IMPORT_PLAYLIST" | "QUEUE_REMOVE_ITEM" | "QUEUE_SKIP_CURRENT" | "QUEUE_PLAY_NEXT" | "CHAT_SEND"
   roomId: string
   "x-pt-local-id": string
   "x-pt-stamp": number
@@ -274,6 +285,11 @@ export interface ReqQueueSkipCurrent extends ReqBase {
 export interface ReqQueuePlayNext extends ReqBase {
   operateType: "QUEUE_PLAY_NEXT"
   itemId: string
+}
+
+export interface ReqChatSend extends ReqBase {
+  operateType: "CHAT_SEND"
+  content: string
 }
 
 export interface RequestContext {

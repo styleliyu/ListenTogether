@@ -5,6 +5,7 @@ import PtButton from "../../components/PtButton"
 import RoomHeader from "../../components/room/RoomHeader"
 import PlayerPanel from "../../components/room/PlayerPanel"
 import QueueList from "../../components/room/QueueList"
+import ChatPanel from "../../components/room/ChatPanel"
 import RoomMembersPanel from "../../components/room/RoomMembersPanel"
 import RoomManagePopup from "../../components/room/RoomManagePopup"
 import RoomSharePopup from "../../components/room/RoomSharePopup"
@@ -33,6 +34,8 @@ export default function RoomPage() {
     onTransferOwner,
     onRoomNameChange,
     onDeleteRoom,
+    onSendChatMessage,
+    onClearChatError,
   } = useRoomPage(playerEl)
 
   const [showManagePopup, setShowManagePopup] = useState(false)
@@ -95,6 +98,14 @@ export default function RoomPage() {
             onCancelPlaylistImport={onCancelPlaylistImport}
             onTogglePlaylistImportPanel={onTogglePlaylistImportPanel}
             onToggleFailureDetails={() => setShowFailureDetails(value => !value)}
+          />
+
+          <ChatPanel
+            messages={pageData.chatMessages}
+            participants={pageData.participants}
+            chatError={pageData.chatError}
+            onSendMessage={onSendChatMessage}
+            onClearError={onClearChatError}
           />
 
           <div className="room-virtual-one" />

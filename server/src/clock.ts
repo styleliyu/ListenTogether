@@ -3,6 +3,7 @@ import { env } from "./config/env"
 import type { Room } from "./types"
 import { getOwnerGuestId, normalizeRoomConfig, resolveOwnerAfterParticipants } from "./permissionService"
 import { broadcaster } from "./websocket/broadcaster"
+import { clearRoomChatHistory } from "./chatService"
 
 export function startRoomClock(intervalMs: number): NodeJS.Timeout {
   const run = async () => {
@@ -76,7 +77,10 @@ function handleEmptyRoom(room: Room, now: number): void {
     patch.participants = []
   }
 
-  if (Object.keys(patch).length > 0) roomRepo.update(room._id, patch)
+  if (Object.keys(patch).length > 0) {
+    roomRepo.update(room._id, patch)
+    if (patch.oState === "DELETED") clearRoomChatHistory(room._id)
+  }
 }
 
 function buildPausePatch(room: Room, lastHeartbeat: number, now: number): Partial<Room> {

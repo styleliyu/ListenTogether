@@ -7,10 +7,13 @@ import { buildPlaybackUpdate, canOperatePlayer, shouldIgnoreRapidSameOperator } 
 import { buildQueueRoomStatus, canOperateQueue, contentToQueueItem, getNextQueueIndex, getSkipQueueIndex, isPlayMode, moveQueueItemAfterCurrent, normalizeQueue, reconcileQueueCurrent, removeQueueItem, sanitizeQueueItems } from "./queueService"
 import { broadcaster } from "./websocket/broadcaster"
 import { DEFAULT_ROOM_CONFIG, canControlPlayback, canImportPlaylist, normalizeRoomConfig } from "./permissionService"
+import { appendChatMessage, checkChatRateLimit, getChatHistory, normalizeChatContent } from "./chatService"
 import type {
   ContentData,
+  Participant,
   QueueItem,
   ReqAppendQueue,
+  ReqChatSend,
   ReqImportPlaylist,
   PtWebSocket,
   ReqAdvanceQueue,
@@ -99,6 +102,7 @@ async function handleMessage(socket: PtWebSocket, data: unknown): Promise<void> 
   else if (req.operateType === "QUEUE_REMOVE_ITEM") await handleQueueRemoveItem(socket, req as ReqQueueRemoveItem)
   else if (req.operateType === "QUEUE_SKIP_CURRENT") await handleQueueSkipCurrent(socket, req as ReqQueueSkipCurrent)
   else if (req.operateType === "QUEUE_PLAY_NEXT") await handleQueuePlayNext(socket, req as ReqQueuePlayNext)
+  else if (req.operateType === "CHAT_SEND") await handleChatSend(socket, req as ReqChatSend)
   else if (req.operateType === "HEARTBEAT") handleHeartbeat(socket, req)
 }
 
@@ -143,6 +147,10 @@ async function handleFirstSend(socket: PtWebSocket, req: ReqBase): Promise<void>
       currentItemId: queue?.currentItemId,
       playMode: queue?.playMode
     }
+  })
+  broadcaster.send(socket, {
+    responseType: "CHAT_HISTORY",
+    chatMessages: getChatHistory(req.roomId)
   })
   const progress = getPlaylistImportProgress(req.roomId)
   if (progress) {
@@ -351,6 +359,38 @@ async function handleQueuePlayNext(socket: PtWebSocket, req: ReqQueuePlayNext): 
   broadcaster.broadcastRoomStatus(req.roomId, buildQueueRoomStatus(req.roomId, room, queue, guestId))
 }
 
+async function handleChatSend(socket: PtWebSocket, req: ReqChatSend): Promise<void> {
+  const room = roomRepo.get(req.roomId)
+  const participant = getRoomParticipant(req["x-pt-local-id"], room)
+  if (!room || !participant) {
+    socket.close()
+    return
+  }
+
+  const contentResult = normalizeChatContent(req.content)
+  if (!contentResult.ok || !contentResult.content) {
+    sendOperationError(socket, req, contentResult.message || "消息发送失败")
+    return
+  }
+
+  const rateLimit = checkChatRateLimit(req.roomId, participant.guestId)
+  if (!rateLimit.allowed) {
+    sendOperationError(socket, req, "发送太快了，请稍后再发")
+    return
+  }
+
+  const chatMessage = appendChatMessage({
+    roomId: req.roomId,
+    senderId: participant.guestId,
+    senderName: participant.nickName,
+    content: contentResult.content
+  })
+  broadcaster.broadcastToRoom(req.roomId, {
+    responseType: "CHAT_MESSAGE",
+    chatMessage
+  })
+}
+
 async function pauseQueueAtEnd(roomId: string, room: Room, req: ReqAdvanceQueue | ReqQueueSkipCurrent): Promise<void> {
   const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
   if (!guestId) return
@@ -449,10 +489,10 @@ function queueItemResolveKey(item: QueueItem): string {
   return `${item.sourceType}:${item.resourceId || item.linkUrl || item.id}`
 }
 
-function checkReqObject(data: ReqBase | ReqOperatePlayer | ReqSetQueueIndex | ReqAdvanceQueue | ReqSetPlayMode | ReqAppendQueue | ReqImportPlaylist | ReqQueueRemoveItem | ReqQueueSkipCurrent | ReqQueuePlayNext): boolean {
+function checkReqObject(data: ReqBase | ReqOperatePlayer | ReqSetQueueIndex | ReqAdvanceQueue | ReqSetPlayMode | ReqAppendQueue | ReqImportPlaylist | ReqQueueRemoveItem | ReqQueueSkipCurrent | ReqQueuePlayNext | ReqChatSend): boolean {
   if (!data) return false
   if (!data.operateType || !data.roomId || !data["x-pt-local-id"] || !data["x-pt-stamp"]) return false
-  if (!["FIRST_SEND", "SET_PLAYER", "HEARTBEAT", "SET_QUEUE_INDEX", "ADVANCE_QUEUE", "SET_PLAY_MODE", "APPEND_QUEUE", "IMPORT_PLAYLIST", "QUEUE_REMOVE_ITEM", "QUEUE_SKIP_CURRENT", "QUEUE_PLAY_NEXT"].includes(data.operateType)) return false
+  if (!["FIRST_SEND", "SET_PLAYER", "HEARTBEAT", "SET_QUEUE_INDEX", "ADVANCE_QUEUE", "SET_PLAY_MODE", "APPEND_QUEUE", "IMPORT_PLAYLIST", "QUEUE_REMOVE_ITEM", "QUEUE_SKIP_CURRENT", "QUEUE_PLAY_NEXT", "CHAT_SEND"].includes(data.operateType)) return false
 
   if (data.operateType === "SET_PLAYER") {
     const req = data as ReqOperatePlayer
@@ -493,6 +533,11 @@ function checkReqObject(data: ReqBase | ReqOperatePlayer | ReqSetQueueIndex | Re
     if (typeof req.itemId !== "string" || !req.itemId.trim()) return false
   }
 
+  if (data.operateType === "CHAT_SEND") {
+    const req = data as ReqChatSend
+    if (typeof req.content !== "string") return false
+  }
+
   return true
 }
 
@@ -508,23 +553,26 @@ function getReqObject(data: unknown): ReqBase | undefined {
 }
 
 function getOperatorGuestId(clientId: string, room?: Room): string | undefined {
+  return getRoomParticipant(clientId, room)?.guestId
+}
+
+function getRoomParticipant(clientId: string, room?: Room): Participant | undefined {
   if (!room) return undefined
   if (room.oState === "EXPIRED" || room.oState === "DELETED") return undefined
-  const me = room.participants.find(v => v.nonce === clientId)
-  return me?.guestId
+  return room.participants.find(v => v.nonce === clientId)
 }
 
 function isSpeedRate(value: string): value is SpeedRate {
   return ["0.8", "1", "1.2", "1.5", "1.7"].includes(value)
 }
 
-function sendOperationError(socket: PtWebSocket, req: ReqBase): void {
+function sendOperationError(socket: PtWebSocket, req: ReqBase, message?: string): void {
   broadcaster.send(socket, {
     responseType: "OPERATION_ERROR",
     operationError: {
       roomId: req.roomId,
       operateType: req.operateType,
-      message: getPermissionDeniedMessage(req.operateType)
+      message: message || getPermissionDeniedMessage(req.operateType)
     }
   })
 }
