@@ -29,6 +29,15 @@
 
 房间聊天记录当前只以内存保存每个房间最近 50 条消息，服务重启后聊天历史会丢失。当前聊天室允许房间内成员发送文字消息，并带有基础防刷屏限制；后续可扩展聊天权限开关。
 
+PostgreSQL 迁移仍处于前置准备阶段，当前版本没有连接或支持 PostgreSQL。迁移草案见 [docs/postgres-migration.md](./docs/postgres-migration.md)。后端提供只读 dry-run 检查脚本：
+
+```bash
+cd server
+npm run db:pg-dry-run
+```
+
+该脚本只读取 SQLite 并输出转换检查报告，不会写入 SQLite 或 PostgreSQL。
+
 ## 本地开发
 
 建议使用 Node.js 18 LTS。
