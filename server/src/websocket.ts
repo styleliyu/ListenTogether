@@ -1,6 +1,6 @@
 ﻿import type { Server as HttpServer } from "http"
 import { WebSocketServer } from "ws"
-import { roomRepo } from "./db"
+import { roomRepo } from "./repositories"
 import { resolveQueueItemContent } from "./music/musicAdapter"
 import { getPlaylistImportProgress, importPlaylistByLink, setPlaylistImportBroadcaster } from "./playlistImport"
 import { buildPlaybackUpdate, canOperatePlayer, shouldIgnoreRapidSameOperator } from "./playbackService"

@@ -3,9 +3,11 @@ import path from "path"
 import crypto from "crypto"
 import Database from "better-sqlite3"
 import type { Room, Visitor } from "./types"
+import { env } from "./config/env"
+import type { RoomRepository, VisitorRepository } from "./repositories/types"
 
 const DEFAULT_DB_PATH = path.resolve(process.cwd(), "data", "podcast-together.db")
-const dbPath = path.resolve(process.env.DATABASE_PATH || DEFAULT_DB_PATH)
+const dbPath = path.resolve(env.databasePath || DEFAULT_DB_PATH)
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 
@@ -65,7 +67,7 @@ function saveRoom(room: Room): void {
   })
 }
 
-export const roomRepo = {
+export const roomRepo: RoomRepository = {
   add(room: Omit<Room, "_id">): string {
     const id = createId()
     saveRoom({ ...room, _id: id })
@@ -113,7 +115,7 @@ function saveVisitor(visitor: Visitor): void {
   })
 }
 
-export const visitorRepo = {
+export const visitorRepo: VisitorRepository = {
   getByNonce(nonce: string): Visitor | undefined {
     const row = db.prepare("SELECT id, data FROM visitors WHERE nonce = ?").get(nonce) as { id: string; data: string } | undefined
     if (!row) return undefined

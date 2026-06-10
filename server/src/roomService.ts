@@ -10,7 +10,7 @@ import type {
   RoomPermissionConfig,
   Visitor
 } from "./types"
-import { roomRepo, visitorRepo } from "./db"
+import { roomRepo, visitorRepo } from "./repositories"
 import { startPlaylistImport, stopPlaylistImportForRoom } from "./playlistImport"
 import { env } from "./config/env"
 import { broadcaster } from "./websocket/broadcaster"

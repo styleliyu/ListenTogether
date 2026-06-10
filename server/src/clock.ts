@@ -1,4 +1,4 @@
-import { roomRepo } from "./db"
+import { roomRepo } from "./repositories"
 import { env } from "./config/env"
 import type { Room } from "./types"
 import { getOwnerGuestId, normalizeRoomConfig, resolveOwnerAfterParticipants } from "./permissionService"

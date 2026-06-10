@@ -10,7 +10,7 @@ import { dbPath } from "./db"
 import { getUploadRoot, handleUploadAudio, handleUploadError, uploadMiddleware } from "./upload"
 import { cancelPlaylistImport } from "./playlistImport"
 import { env } from "./config/env"
-import { roomRepo } from "./db"
+import { roomRepo } from "./repositories"
 import { canImportPlaylist } from "./permissionService"
 
 const app = express()
