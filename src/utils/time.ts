@@ -1,5 +1,5 @@
-import api from "../request/api"
-import { RequestRes } from "../type"
+import api from "../services/endpoints"
+import type { RequestRes } from "../types"
 import util from "./util"
 
 let diff = 0

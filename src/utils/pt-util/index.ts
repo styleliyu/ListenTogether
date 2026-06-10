@@ -1,5 +1,5 @@
 
-import { StorageUserData } from "../../type"
+import type { StorageUserData } from "../../types"
 import ptApi from "../pt-api"
 import { nanoid } from "nanoid"
 

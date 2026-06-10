@@ -1,4 +1,4 @@
-import { EnvType } from "../type"
+import type { EnvType } from "../types"
 
 // 等待 ms 再执行
 const waitMilli = (ms: number = 1) => {
@@ -151,4 +151,3 @@ export default {
   getLowerCaseNum,
   getUrls,
 }
-

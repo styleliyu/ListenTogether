@@ -1,6 +1,6 @@
 import { Buffer } from "buffer"
 import type { DecryptResult, FileInfo } from "@decrypt-core/decrypt/entity"
-import type { LocalImportFailure, LocalUploadMetadata } from "../type"
+import type { LocalImportFailure, LocalUploadMetadata } from "../types"
 
 type DecryptModule = typeof import("@decrypt-core/decrypt")
 

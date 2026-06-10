@@ -25,7 +25,7 @@
       "./node_modules/user-agent-data-types"
     ]
   },
-  "include": ["src/main.tsx", "src/App.tsx", "src/router/**/*.tsx", "src/pages/**/*.tsx", "src/components/**/*.tsx", "src/hooks/useAudioPlayer.ts", "src/hooks/useHeartbeat.ts", "src/hooks/useRoomPage.ts", "src/hooks/useRoomWebSocket.ts", "src/hooks/useTheme.ts", "src/stores/**/*.ts", "src/services/**/*.ts", "src/types/**/*.ts", "src/utils/**/*.ts", "src/request/**/*.ts", "src/vite-env.d.ts"],
-  "exclude": ["src/decrypt-core/**/__test__/**", "src/**/*.vue"],
+  "include": ["src/main.tsx", "src/App.tsx", "src/router/**/*.tsx", "src/pages/**/*.tsx", "src/components/**/*.tsx", "src/hooks/**/*.ts", "src/stores/**/*.ts", "src/services/**/*.ts", "src/types/**/*.ts", "src/utils/**/*.ts", "src/vite-env.d.ts"],
+  "exclude": ["src/decrypt-core/**/__test__/**"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -3,12 +3,19 @@ import { useNavigate, useParams } from "react-router-dom"
 import { useRoomStore } from "../stores/roomStore"
 import { useHeartbeat } from "./useHeartbeat"
 import { useRoomWebSocket } from "./useRoomWebSocket"
+import { useRoomPermissions } from "./useRoomPermissions"
 import {
   getReSeek,
   isSamePlayingTrack,
   isSameQueueItems,
   useAudioPlayer,
 } from "./useAudioPlayer"
+import {
+  buildPlaybackSignature,
+  contentToQueueItems,
+  enterResToErrState,
+  type RoomStatusClassification,
+} from "./roomPageHelpers"
 import ptUtil from "../utils/pt-util"
 import time from "../utils/time"
 import util from "../utils/util"
@@ -25,12 +32,9 @@ import {
 } from "../services/roomRequest"
 import { handleShowMoreBox, showParticipants } from "../utils/format"
 import type {
-  ContentData,
-  PageState,
   PlayMode,
   QueueItem,
   RevokeType,
-  RoomQueue,
   RoomStatus,
   WsMsgRes,
 } from "../types"
@@ -39,11 +43,6 @@ const COLLECT_TIMEOUT = 300
 const MAX_HB_NUM = 960
 const PAUSED_IDLE_LEAVE_TIMEOUT_SEC = 30 * 60
 const STALE_PLAYBACK_REPORT_SUPPRESS_MS = 2500
-
-interface RoomStatusClassification {
-  trackChanged: boolean
-  playbackStatusChanged: boolean
-}
 
 export function useRoomPage(playerEl: RefObject<HTMLElement>) {
   const { roomId = "" } = useParams()
@@ -71,24 +70,13 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
   const queueActionLockUntilRef = useRef(0)
   const playlistImportPanelTouchedRef = useRef(false)
 
-  const canControlPlayback = useCallback(() => {
-    const data = store.getState().pageData
-    return data.amIOwner || data.permissions.memberCanControlPlayback
-  }, [store])
-
-  const canManageQueue = useCallback(() => {
-    const data = store.getState().pageData
-    return data.amIOwner || data.permissions.memberCanManageQueue
-  }, [store])
-
-  const canImportPlaylist = useCallback(() => {
-    const data = store.getState().pageData
-    return data.amIOwner || data.permissions.memberCanImportPlaylist
-  }, [store])
-
-  const showOperateFailed = useCallback((content = "你没有权限执行这个操作。") => {
-    window.alert(content)
-  }, [])
+  const getPageData = useCallback(() => store.getState().pageData, [store])
+  const {
+    canControlPlayback,
+    canManageQueue,
+    canImportPlaylist,
+    showOperateFailed,
+  } = useRoomPermissions(getPageData)
 
   const sendWs = useCallback((obj: Record<string, any>) => {
     websocket.send({
@@ -117,14 +105,6 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     return time.getLocalTime() < suppressLocalPlaybackReportUntilRef.current
   }, [])
 
-  const buildPlaybackSignature = useCallback((status: RoomStatus, content?: ContentData, queue?: RoomQueue): string => {
-    const itemById = queue?.currentItemId ? queue.items.find(item => item.id === queue.currentItemId) : undefined
-    const currentItem = itemById || queue?.items?.[queue.currentIndex]
-    const audioUrl = currentItem?.audioUrl || content?.audioUrl || ""
-    const id = queue?.currentItemId || currentItem?.id || `${content?.sourceType || "audio"}:${content?.linkUrl || audioUrl}`
-    return [id, audioUrl, status.playStatus, status.contentStamp, status.operateStamp].join("|")
-  }, [])
-
   const classifyRoomStatus = useCallback((status: RoomStatus): RoomStatusClassification => {
     const data = store.getState().pageData
     const nextContent = status.content || data.content
@@ -135,7 +115,7 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
       || trackChanged
       || nextSignature !== lastAppliedPlaybackSignatureRef.current
     return { trackChanged, playbackStatusChanged }
-  }, [buildPlaybackSignature, store])
+  }, [store])
 
   const createPlayer = useCallback(() => {
     const data = store.getState().pageData
@@ -243,7 +223,7 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
       store.getState().pageData.content,
       store.getState().pageData.queue,
     )
-  }, [applyRoomStatus, audio, buildPlaybackSignature, store])
+  }, [applyRoomStatus, audio, store])
 
   const handleWebSocketMessage = useCallback((msgRes: WsMsgRes) => {
     if (msgRes.responseType === "CONNECTED") {
@@ -298,16 +278,6 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     })
   }, [handleWebSocketMessage, websocket])
 
-  const enterResToErrState = useCallback((code?: string): PageState | null => {
-    if (!code) return 13
-    if (code === "0000") return null
-    if (code === "E4004") return 12
-    if (code === "E4006") return 11
-    if (code === "E4003") return 14
-    if (code === "R0001") return 15
-    return 20
-  }, [])
-
   const enterRoom = useCallback(async () => {
     store.getState().reset()
     store.getState().setRoomId(roomId)
@@ -342,7 +312,7 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     createPlayer()
     connectWebSocket()
     startHeartbeat()
-  }, [connectWebSocket, createPlayer, enterResToErrState, roomId, store])
+  }, [connectWebSocket, createPlayer, roomId, store])
 
   const leaveRoom = useCallback(async (sendLeave = true) => {
     heartbeat.stop()
@@ -619,17 +589,4 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     pageData,
     toEditMyName,
   ])
-}
-
-function contentToQueueItems(content: ContentData): QueueItem[] {
-  if (content.queue?.items?.length) return content.queue.items
-  return [{
-    id: `${content.sourceType || "audio"}:${content.linkUrl || content.audioUrl}`,
-    sourceType: content.sourceType || "audio",
-    title: content.title || content.seriesName || "音频",
-    artist: content.seriesName || "",
-    imageUrl: content.imageUrl || "",
-    linkUrl: content.linkUrl || "",
-    audioUrl: content.audioUrl,
-  }]
 }

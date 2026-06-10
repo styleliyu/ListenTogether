@@ -50,9 +50,6 @@ dependencies:
   vconsole:
     specifier: ^3.15.1
     version: 3.15.1
-  weixin-js-sdk-ts:
-    specifier: ^1.6.1
-    version: 1.6.1
   zustand:
     specifier: ^4.5.2
     version: 4.5.2(@types/react@18.2.66)(react@18.2.0)
@@ -4203,16 +4200,6 @@ packages:
   /webidl-conversions@4.0.2:
     resolution: {integrity: sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg==}
     dev: true
-
-  /weixin-js-sdk-ts@1.6.1:
-    resolution: {integrity: sha512-nnW5zjmg3JG3d+LsNA9ZK3aEKJ1JUR8UU5le84iXEcgfkjVtW0DAucrv/RPD3VHGDUM/5OD43a3bWoGWxIID0A==}
-    dependencies:
-      weixin-js-sdk: 1.6.0
-    dev: false
-
-  /weixin-js-sdk@1.6.0:
-    resolution: {integrity: sha512-3IYQH7aalJGFJrwdT3epvTdR1MboMiH7vIZ5BRL2eYOJ12BNah7csoMkmSZzkq1+l92sSq29XdTCVjCJoK2sBQ==}
-    dev: false
 
   /whatwg-url@7.1.0:
     resolution: {integrity: sha512-WUu7Rg1DroM7oQvGWfOiAK21n74Gg+T4elXEQYkOhtyLeWiJFoOGLXPKI/9gzIie9CtwVLm8wtw6YJdKyxSjeg==}

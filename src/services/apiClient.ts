@@ -1,10 +1,10 @@
-import rq from "../request"
-import api from "../request/api"
+import api from "./endpoints"
+import { request } from "./request"
 import ptUtil from "../utils/pt-util"
 import type { ContentData, LocalUploadMetadata, RequestRes, RoRes, UploadAudioData } from "../types"
 
 export async function parseText(link: string): Promise<RequestRes<ContentData>> {
-  return rq.request<ContentData>(api.PARSE_TEXT, { link })
+  return request<ContentData>(api.PARSE_TEXT, { link })
 }
 
 export async function createRoom(
@@ -13,7 +13,7 @@ export async function createRoom(
   roomName = "",
 ): Promise<RequestRes<RoRes>> {
   const userData = ptUtil.getUserData()
-  return rq.request<RoRes>(api.ROOM_OPERATE, {
+  return request<RoRes>(api.ROOM_OPERATE, {
     operateType: "CREATE",
     roomData,
     nickName: userData.nickName,
