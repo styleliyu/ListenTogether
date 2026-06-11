@@ -134,7 +134,8 @@
 }
 
 .queue-actions button,
-.playlist-import-panel button {
+.playlist-import-panel button,
+.queue-list__more button {
   border: 0;
   border-radius: 6px;
   background: var(--other-btn-bg);
@@ -236,6 +237,23 @@
   margin-top: 14px;
   max-height: 320px;
   overflow: auto;
+}
+
+.queue-list__more {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--note-color);
+  font-size: 13px;
+}
+
+.queue-list__more-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .queue-item {
@@ -377,9 +395,38 @@
   background: var(--card-color);
   color: var(--note-color);
   display: flex;
+  flex-direction: column;
+  gap: 4px;
   align-items: center;
   justify-content: center;
   font-size: 14px;
+}
+
+.room-chat__notice {
+  align-self: center;
+  max-width: 92%;
+  box-sizing: border-box;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: rgba(127, 127, 127, .12);
+  color: var(--note-color);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.room-chat__notice-time {
+  flex: 0 0 auto;
+  color: var(--note-color);
+}
+
+.room-chat__notice-content {
+  color: var(--desc-color);
 }
 
 .room-chat__message {
@@ -938,19 +985,46 @@
   cursor: pointer;
 }
 
-.rp-player .shk {
-  padding-bottom: 26px;
+.rp-player .shk-player {
+  height: auto;
+  min-height: 178px;
+  border-radius: 8px;
+}
+
+.rp-player .shk-cover {
+  width: 112px;
+  height: 112px;
+  margin-right: 18px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rp-player .shk-main {
+  min-height: 112px;
+  padding: 0;
 }
 
 .rp-player .shk-bar_wrap {
-  top: auto !important;
-  bottom: 0;
+  position: absolute;
+  left: 16px;
+  right: auto;
+  top: 136px !important;
+  bottom: auto;
+  width: 112px;
   padding: 8px 0;
 }
 
 .rp-player .shk-display {
-  top: auto !important;
-  bottom: -18px;
+  top: 158px !important;
+  left: 16px;
+  right: auto;
+  width: 112px;
+}
+
+.rp-player .shk-time {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .shk-bar {
@@ -984,6 +1058,15 @@
     justify-content: flex-start;
   }
 
+  .queue-list__more {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .queue-list__more-actions {
+    justify-content: flex-start;
+  }
+
   .queue-item {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
@@ -1008,6 +1091,49 @@
 
   .room-chat__sender {
     max-width: 120px;
+  }
+
+  .room-chat__notice {
+    align-items: center;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .rp-player .shk-player {
+    min-height: 326px;
+    padding: 16px;
+  }
+
+  .rp-player .shk-body {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rp-player .shk-cover {
+    display: block;
+    width: 180px;
+    height: 180px;
+    margin: 0 auto 54px;
+  }
+
+  .rp-player .shk-main {
+    min-height: auto;
+    width: 100%;
+  }
+
+  .rp-player .shk-bar_wrap {
+    left: 16px;
+    right: 16px;
+    top: 204px !important;
+    width: auto;
+    margin: 0;
+  }
+
+  .rp-player .shk-display {
+    left: 16px;
+    right: 16px;
+    top: 226px !important;
+    width: auto;
   }
 
   .rsp-actions {

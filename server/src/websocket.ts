@@ -8,6 +8,7 @@ import { buildQueueRoomStatus, canOperateQueue, contentToQueueItem, getNextQueue
 import { broadcaster } from "./websocket/broadcaster"
 import { DEFAULT_ROOM_CONFIG, canControlPlayback, canImportPlaylist, normalizeRoomConfig } from "./permissionService"
 import { appendChatMessage, checkChatRateLimit, getChatHistory, normalizeChatContent } from "./chatService"
+import { appendRoomNotice, getRoomNoticeHistory } from "./roomNoticeService"
 import type {
   ContentData,
   Participant,
@@ -26,6 +27,7 @@ import type {
   ReqSetQueueIndex,
   Room,
   RoomConfig,
+  RoomNoticeType,
   RoomQueue,
   RoomStatus,
   SpeedRate
@@ -152,6 +154,10 @@ async function handleFirstSend(socket: PtWebSocket, req: ReqBase): Promise<void>
     responseType: "CHAT_HISTORY",
     chatMessages: getChatHistory(req.roomId)
   })
+  broadcaster.send(socket, {
+    responseType: "ROOM_NOTICE_HISTORY",
+    roomNotices: getRoomNoticeHistory(req.roomId)
+  })
   const progress = getPlaylistImportProgress(req.roomId)
   if (progress) {
     broadcaster.send(socket, {
@@ -230,6 +236,7 @@ async function handleSetPlayMode(socket: PtWebSocket, req: ReqSetPlayMode): Prom
   const queue = normalizeQueue({ ...baseQueue, playMode: req.playMode }) as RoomQueue
   await roomRepo.update(req.roomId, { queue, operator: guestId })
   broadcaster.broadcastRoomStatus(req.roomId, buildQueueRoomStatus(req.roomId, room, queue, guestId))
+  broadcastRoomNotice(req.roomId, "playback", `播放方式切换为${playModeLabel(queue.playMode)}`)
 }
 
 async function handleAppendQueue(socket: PtWebSocket, req: ReqAppendQueue): Promise<void> {
@@ -251,6 +258,7 @@ async function handleAppendQueue(socket: PtWebSocket, req: ReqAppendQueue): Prom
 
   await roomRepo.update(req.roomId, { queue, operator: guestId })
   broadcaster.broadcastRoomStatus(req.roomId, buildQueueRoomStatus(req.roomId, room, queue, guestId))
+  broadcastRoomNotice(req.roomId, "queue", `添加了 ${incoming.length} 首歌曲到队列`)
 }
 
 async function handleImportPlaylist(socket: PtWebSocket, req: ReqImportPlaylist): Promise<void> {
@@ -268,6 +276,9 @@ async function handleImportPlaylist(socket: PtWebSocket, req: ReqImportPlaylist)
     responseType: "PLAYLIST_IMPORT_PROGRESS",
     playlistImportProgress: progress
   })
+  if (progress.status === "failed") {
+    broadcastRoomNotice(req.roomId, "playlist_import", progress.message || "歌单导入失败")
+  }
 }
 
 async function handleQueueRemoveItem(socket: PtWebSocket, req: ReqQueueRemoveItem): Promise<void> {
@@ -283,6 +294,7 @@ async function handleQueueRemoveItem(socket: PtWebSocket, req: ReqQueueRemoveIte
 
   const result = removeQueueItem(baseQueue, req.itemId)
   if (!result) return
+  const removedItem = baseQueue.items.find(item => item.id === req.itemId)
 
   if (!result.queue.items.length) {
     await roomRepo.update(req.roomId, {
@@ -305,11 +317,13 @@ async function handleQueueRemoveItem(socket: PtWebSocket, req: ReqQueueRemoveIte
       currentItemId: result.queue.currentItemId,
       playMode: result.queue.playMode
     })
+    broadcastRoomNotice(req.roomId, "queue", `删除歌曲：${removedItem?.title || "未知歌曲"}`)
     return
   }
 
   if (result.removedCurrent) {
     await switchQueueIndex(req.roomId, { ...room, queue: result.queue }, result.queue.currentIndex, req["x-pt-stamp"], req["x-pt-local-id"], room.playStatus)
+    broadcastRoomNotice(req.roomId, "queue", `删除当前歌曲：${removedItem?.title || "未知歌曲"}`)
     return
   }
 
@@ -318,6 +332,7 @@ async function handleQueueRemoveItem(socket: PtWebSocket, req: ReqQueueRemoveIte
     operator: guestId
   })
   broadcaster.broadcastRoomStatus(req.roomId, buildQueueRoomStatus(req.roomId, room, result.queue, guestId))
+  broadcastRoomNotice(req.roomId, "queue", `删除歌曲：${removedItem?.title || "未知歌曲"}`)
 }
 
 async function handleQueueSkipCurrent(socket: PtWebSocket, req: ReqQueueSkipCurrent): Promise<void> {
@@ -351,12 +366,14 @@ async function handleQueuePlayNext(socket: PtWebSocket, req: ReqQueuePlayNext): 
 
   const queue = moveQueueItemAfterCurrent(baseQueue, req.itemId)
   if (!queue) return
+  const targetItem = baseQueue.items.find(item => item.id === req.itemId)
 
   await roomRepo.update(req.roomId, {
     queue,
     operator: guestId
   })
   broadcaster.broadcastRoomStatus(req.roomId, buildQueueRoomStatus(req.roomId, room, queue, guestId))
+  broadcastRoomNotice(req.roomId, "queue", `设为下一首：${targetItem?.title || "未知歌曲"}`)
 }
 
 async function handleChatSend(socket: PtWebSocket, req: ReqChatSend): Promise<void> {
@@ -413,6 +430,7 @@ async function pauseQueueAtEnd(roomId: string, room: Room, req: ReqAdvanceQueue 
     currentItemId: room.queue?.currentItemId,
     playMode: room.queue?.playMode
   })
+  broadcastRoomNotice(roomId, "playback", "队列播放结束")
 }
 
 async function switchQueueIndex(
@@ -466,6 +484,7 @@ async function switchQueueIndex(
     currentItemId: queue.currentItemId,
     playMode: queue.playMode
   })
+  broadcastRoomNotice(roomId, "playback", `切换歌曲：${targetItem.title || "未知歌曲"}`)
 }
 
 function canLazyResolveQueueItem(roomId: string, item: QueueItem): boolean {
@@ -564,6 +583,19 @@ function getRoomParticipant(clientId: string, room?: Room): Participant | undefi
 
 function isSpeedRate(value: string): value is SpeedRate {
   return ["0.8", "1", "1.2", "1.5", "1.7"].includes(value)
+}
+
+function broadcastRoomNotice(roomId: string, type: RoomNoticeType, content: string): void {
+  const text = content.trim()
+  if (!text) return
+  const notice = appendRoomNotice({ roomId, type, content: text })
+  broadcaster.broadcastRoomNotice(roomId, notice)
+}
+
+function playModeLabel(playMode: string): string {
+  if (playMode === "shuffle") return "随机"
+  if (playMode === "single") return "单曲循环"
+  return "顺序"
 }
 
 function sendOperationError(socket: PtWebSocket, req: ReqBase, message?: string): void {

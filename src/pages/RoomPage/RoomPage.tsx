@@ -102,6 +102,7 @@ export default function RoomPage() {
 
           <ChatPanel
             messages={pageData.chatMessages}
+            roomNotices={pageData.roomNotices}
             participants={pageData.participants}
             chatError={pageData.chatError}
             onSendMessage={onSendChatMessage}

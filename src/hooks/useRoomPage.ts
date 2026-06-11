@@ -43,6 +43,7 @@ const COLLECT_TIMEOUT = 300
 const MAX_HB_NUM = 960
 const PAUSED_IDLE_LEAVE_TIMEOUT_SEC = 30 * 60
 const STALE_PLAYBACK_REPORT_SUPPRESS_MS = 2500
+const PENDING_REMOTE_CONFIRM_MS = 2500
 
 export function useRoomPage(playerEl: RefObject<HTMLElement>) {
   const { roomId = "" } = useParams()
@@ -69,6 +70,8 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
   const suppressLocalPlaybackReportUntilRef = useRef(0)
   const queueActionLockUntilRef = useRef(0)
   const playlistImportPanelTouchedRef = useRef(false)
+  const pendingPlayModeRef = useRef<{ value: PlayMode; until: number } | null>(null)
+  const pendingPlaybackRateRef = useRef<{ value: number; until: number } | null>(null)
 
   const getPageData = useCallback(() => store.getState().pageData, [store])
   const {
@@ -133,7 +136,13 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
         audio.playStatusRef.current = "PLAYING"
         collectLatestStatus()
       },
-      ratechange: () => undefined,
+      ratechange: () => {
+        pendingPlaybackRateRef.current = {
+          value: Number(audio.localPlaybackRateRef.current || 1),
+          until: time.getLocalTime() + PENDING_REMOTE_CONFIRM_MS,
+        }
+        collectLatestStatus()
+      },
       seeked: () => collectLatestStatus(),
       ended: () => {
         if (!store.getState().pageData.queue) return
@@ -162,9 +171,22 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
       patch.content = status.content
       patch.showMoreBox = handleShowMoreBox(status.content)
     }
-    if (status.queue) patch.queue = status.queue
+    if (status.queue) {
+      const now = time.getLocalTime()
+      const pendingPlayMode = pendingPlayModeRef.current
+      const pendingConfirmed = Boolean(pendingPlayMode && status.queue.playMode === pendingPlayMode.value)
+      const pendingExpired = Boolean(pendingPlayMode && pendingPlayMode.until <= now)
+      if (pendingConfirmed || pendingExpired) {
+        pendingPlayModeRef.current = null
+        if (current.pendingPlayMode) patch.pendingPlayMode = undefined
+      }
+      if (!pendingPlayModeRef.current && current.pendingPlayMode && current.pendingPlayMode === status.queue.playMode) {
+        patch.pendingPlayMode = undefined
+      }
+      if (!isSameQueueItems(current.queue, status.queue)) patch.queue = status.queue
+    }
     if (typeof status.roomName === "string") patch.roomName = status.roomName
-    store.getState().patchPageData(patch)
+    if (Object.keys(patch).length > 0) store.getState().patchPageData(patch)
     if (status.everyoneCanOperatePlayer || status.permissions) {
       store.getState().applyPermissions(status.permissions, status.everyoneCanOperatePlayer)
     }
@@ -176,6 +198,24 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     }
     return classification
   }, [audio.playStatusRef, classifyRoomStatus, createPlayer, store, suppressLocalPlaybackReport])
+
+  const applyRemotePlaybackRate = useCallback((speedRate: string) => {
+    const remoteRate = Number(speedRate || 1)
+    if (!Number.isFinite(remoteRate) || remoteRate <= 0) return
+
+    const now = time.getLocalTime()
+    const pending = pendingPlaybackRateRef.current
+    if (pending) {
+      if (Math.abs(remoteRate - pending.value) < 0.001 || pending.until <= now) {
+        pendingPlaybackRateRef.current = null
+      } else {
+        audio.applyLocalPlaybackRate()
+        return
+      }
+    }
+
+    audio.setLocalPlaybackRate(remoteRate, true)
+  }, [audio])
 
   const receiveNewStatus = useCallback(async (fromType: RevokeType = "ws") => {
     const latestStatus = latestStatusRef.current
@@ -198,7 +238,7 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     )
     if (reSeekSec >= 0) audio.seekByRemote(reSeekSec)
 
-    audio.applyLocalPlaybackRate()
+    applyRemotePlaybackRate(latestStatus.speedRate)
 
     const diffToEnd = (audio.srcDurationRef.current * 1000) - latestStatus.contentStamp
     const shouldForcePlayAfterTrackChange = statusType.trackChanged && latestStatus.playStatus === "PLAYING"
@@ -223,7 +263,7 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
       store.getState().pageData.content,
       store.getState().pageData.queue,
     )
-  }, [applyRoomStatus, audio, store])
+  }, [applyRemotePlaybackRate, applyRoomStatus, audio, store])
 
   const handleWebSocketMessage = useCallback((msgRes: WsMsgRes) => {
     if (msgRes.responseType === "CONNECTED") {
@@ -266,9 +306,22 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
       store.getState().appendChatMessage(msgRes.chatMessage)
       return
     }
+    if (msgRes.responseType === "ROOM_NOTICE_HISTORY") {
+      store.getState().setRoomNoticeHistory(msgRes.roomNotices || [])
+      return
+    }
+    if (msgRes.responseType === "ROOM_NOTICE") {
+      if (!msgRes.roomNotice) return
+      store.getState().appendRoomNotice(msgRes.roomNotice)
+      return
+    }
     if (msgRes.responseType === "OPERATION_ERROR") {
       const error = msgRes.operationError
       if (!error || error.roomId !== store.getState().pageData.roomId) return
+      if (error.operateType === "SET_PLAY_MODE") {
+        pendingPlayModeRef.current = null
+        store.getState().setPendingPlayMode(undefined)
+      }
       if (error.operateType === "CHAT_SEND") {
         store.getState().setChatError(error.message || "消息发送失败")
         return
@@ -315,16 +368,24 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     const roRes = res.data
     guestIdRef.current = roRes.guestId || ""
     store.getState().patchPageData({
-      state: 2,
+      state: 3,
       content: roRes.content,
       queue: roRes.queue,
       participants: showParticipants(roRes.participants, guestIdRef.current),
       showMoreBox: handleShowMoreBox(roRes.content),
     })
     store.getState().applyRoomMeta(roRes, guestIdRef.current)
-    createPlayer()
-    connectWebSocket()
-    startHeartbeat()
+    const initPlayerAndConnect = (attempt = 0) => {
+      if (store.getState().pageData.roomId !== roomId) return
+      if (!playerEl.current) {
+        if (attempt < 5) window.setTimeout(() => initPlayerAndConnect(attempt + 1), 50)
+        return
+      }
+      createPlayer()
+      connectWebSocket()
+      startHeartbeat()
+    }
+    window.setTimeout(() => initPlayerAndConnect(), 0)
   }, [connectWebSocket, createPlayer, roomId, store])
 
   const leaveRoom = useCallback(async (sendLeave = true) => {
@@ -460,8 +521,26 @@ export function useRoomPage(playerEl: RefObject<HTMLElement>) {
     if (!data.queue) return
     if (!canControlPlayback()) return showOperateFailed("房主已关闭普通成员播放控制权限。")
     const order: PlayMode[] = ["sequence", "shuffle", "single"]
-    const next = order[(order.indexOf(data.queue.playMode) + 1) % order.length]
-    sendWs({ operateType: "SET_PLAY_MODE", playMode: next })
+    const currentMode = data.pendingPlayMode || data.queue.playMode
+    const next = order[(order.indexOf(currentMode) + 1) % order.length]
+    pendingPlayModeRef.current = {
+      value: next,
+      until: time.getLocalTime() + PENDING_REMOTE_CONFIRM_MS,
+    }
+    store.getState().setPendingPlayMode(next)
+    const sent = sendWs({ operateType: "SET_PLAY_MODE", playMode: next })
+    if (!sent) {
+      pendingPlayModeRef.current = null
+      store.getState().setPendingPlayMode(undefined)
+      showOperateFailed("连接未就绪，请稍后再试。")
+      return
+    }
+    window.setTimeout(() => {
+      const pending = pendingPlayModeRef.current
+      if (!pending || pending.value !== next || pending.until > time.getLocalTime()) return
+      pendingPlayModeRef.current = null
+      store.getState().setPendingPlayMode(undefined)
+    }, PENDING_REMOTE_CONFIRM_MS + 100)
   }, [canControlPlayback, sendWs, showOperateFailed, store])
 
   const onAppendQueueByLink = useCallback(async () => {

@@ -90,6 +90,22 @@ export interface ChatMessage {
   createdAt: number
 }
 
+export type RoomNoticeType =
+  | "member"
+  | "permission"
+  | "playlist_import"
+  | "queue"
+  | "playback"
+  | "system"
+
+export interface RoomNotice {
+  id: string
+  roomId: string
+  type: RoomNoticeType
+  content: string
+  createdAt: number
+}
+
 export interface FailedTrack {
   title?: string
   artist?: string
@@ -187,7 +203,9 @@ export interface PageData {
   playlistImportCollapsed: boolean
   cancellingPlaylistImport: boolean
   chatMessages: ChatMessage[]
+  roomNotices: RoomNotice[]
   chatError?: string
+  pendingPlayMode?: PlayMode
 }
 
 type SpeedRate = "0.8" | "1" | "1.2" | "1.5" | "1.7"
@@ -212,7 +230,7 @@ export interface RoomStatus {
 }
 
 export interface WsMsgRes {
-  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR" | "CHAT_MESSAGE" | "CHAT_HISTORY"
+  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR" | "CHAT_MESSAGE" | "CHAT_HISTORY" | "ROOM_NOTICE" | "ROOM_NOTICE_HISTORY"
   roomStatus?: RoomStatus
   roomInfo?: {
     roomId: string
@@ -225,6 +243,8 @@ export interface WsMsgRes {
   playlistImportProgress?: PlaylistImportProgress
   chatMessage?: ChatMessage
   chatMessages?: ChatMessage[]
+  roomNotice?: RoomNotice
+  roomNotices?: RoomNotice[]
   operationError?: {
     roomId: string
     operateType?: string

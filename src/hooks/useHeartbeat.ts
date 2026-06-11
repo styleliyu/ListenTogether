@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useCallback, useMemo, useRef } from "react"
 import util from "../utils/util"
 
 export function useHeartbeat() {
@@ -17,5 +17,5 @@ export function useHeartbeat() {
     intervalRef.current = null
   }, [])
 
-  return { start, stop }
+  return useMemo(() => ({ start, stop }), [start, stop])
 }

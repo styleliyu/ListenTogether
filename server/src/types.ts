@@ -85,6 +85,22 @@ export interface ChatMessage {
   createdAt: number
 }
 
+export type RoomNoticeType =
+  | "member"
+  | "permission"
+  | "playlist_import"
+  | "queue"
+  | "playback"
+  | "system"
+
+export interface RoomNotice {
+  id: string
+  roomId: string
+  type: RoomNoticeType
+  content: string
+  createdAt: number
+}
+
 export interface PlaylistImportProgress {
   status: "started" | "progress" | "completed" | "cancelled" | "failed"
   roomId: string
@@ -212,7 +228,7 @@ export interface RoomStatus {
 }
 
 export interface ResToFe {
-  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR" | "CHAT_MESSAGE" | "CHAT_HISTORY"
+  responseType: "CONNECTED" | "NEW_STATUS" | "HEARTBEAT" | "PLAYLIST_IMPORT_PROGRESS" | "ROOM_INFO" | "OPERATION_ERROR" | "CHAT_MESSAGE" | "CHAT_HISTORY" | "ROOM_NOTICE" | "ROOM_NOTICE_HISTORY"
   roomStatus?: RoomStatus
   roomInfo?: {
     roomId: string
@@ -225,6 +241,8 @@ export interface ResToFe {
   playlistImportProgress?: PlaylistImportProgress
   chatMessage?: ChatMessage
   chatMessages?: ChatMessage[]
+  roomNotice?: RoomNotice
+  roomNotices?: RoomNotice[]
   operationError?: {
     roomId: string
     operateType?: string

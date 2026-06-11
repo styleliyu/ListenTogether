@@ -6,7 +6,9 @@ import type {
   PageParticipant,
   PageState,
   PlaylistImportProgress,
+  PlayMode,
   RoRes,
+  RoomNotice,
   RoomPermissionConfig,
   RoomQueue,
   RoomRole,
@@ -36,6 +38,7 @@ const initialPageData: PageData = {
   playlistImportCollapsed: false,
   cancellingPlaylistImport: false,
   chatMessages: [],
+  roomNotices: [],
   chatError: "",
 }
 
@@ -53,7 +56,10 @@ interface RoomStoreState {
   updatePlaylistImportProgress: (progress: PlaylistImportProgress, touched: boolean) => void
   setChatHistory: (messages: ChatMessage[]) => void
   appendChatMessage: (message: ChatMessage) => void
+  setRoomNoticeHistory: (notices: RoomNotice[]) => void
+  appendRoomNotice: (notice: RoomNotice) => void
   setChatError: (message?: string) => void
+  setPendingPlayMode: (playMode?: PlayMode) => void
   reset: () => void
 }
 
@@ -73,23 +79,30 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       memberCanImportPlaylist: permissions?.memberCanImportPlaylist ?? legacyAllowed,
     }
     set(({ pageData }) => ({
-      pageData: {
-        ...pageData,
-        permissions: nextPermissions,
-        everyoneCanOperatePlayer: nextPermissions.memberCanControlPlayback ? "Y" : "N",
-      },
+      pageData: isSamePermissions(pageData.permissions, nextPermissions)
+        && pageData.everyoneCanOperatePlayer === (nextPermissions.memberCanControlPlayback ? "Y" : "N")
+        ? pageData
+        : {
+            ...pageData,
+            permissions: nextPermissions,
+            everyoneCanOperatePlayer: nextPermissions.memberCanControlPlayback ? "Y" : "N",
+          },
     }))
   },
   applyOwnerGuestId: (ownerGuestId, guestId) => {
     if (typeof ownerGuestId !== "string") return
     const amIOwner = Boolean(guestId && ownerGuestId === guestId)
     set(({ pageData }) => ({
-      pageData: {
-        ...pageData,
-        ownerGuestId,
-        amIOwner,
-        roomRole: amIOwner ? "owner" : "member",
-      },
+      pageData: pageData.ownerGuestId === ownerGuestId
+        && pageData.amIOwner === amIOwner
+        && pageData.roomRole === (amIOwner ? "owner" : "member")
+        ? pageData
+        : {
+            ...pageData,
+            ownerGuestId,
+            amIOwner,
+            roomRole: amIOwner ? "owner" : "member",
+          },
     }))
   },
   applyRoomMeta: (roRes, guestId) => {
@@ -151,11 +164,38 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       },
     }
   }),
+  setRoomNoticeHistory: (notices) => set(({ pageData }) => ({
+    pageData: {
+      ...pageData,
+      roomNotices: notices.filter(notice => notice.roomId === pageData.roomId).slice(-50),
+    },
+  })),
+  appendRoomNotice: (notice) => set(({ pageData }) => {
+    if (notice.roomId !== pageData.roomId) return { pageData }
+    if (pageData.roomNotices.some(item => item.id === notice.id)) return { pageData }
+    return {
+      pageData: {
+        ...pageData,
+        roomNotices: [...pageData.roomNotices, notice].slice(-50),
+      },
+    }
+  }),
   setChatError: (message = "") => set(({ pageData }) => ({
     pageData: {
       ...pageData,
       chatError: message,
     },
   })),
+  setPendingPlayMode: (playMode) => set(({ pageData }) => ({
+    pageData: pageData.pendingPlayMode === playMode
+      ? pageData
+      : { ...pageData, pendingPlayMode: playMode },
+  })),
   reset: () => set({ pageData: { ...initialPageData, permissions: { ...DEFAULT_ROOM_PERMISSIONS } } }),
 }))
+
+function isSamePermissions(a: RoomPermissionConfig, b: RoomPermissionConfig): boolean {
+  return a.memberCanControlPlayback === b.memberCanControlPlayback
+    && a.memberCanManageQueue === b.memberCanManageQueue
+    && a.memberCanImportPlaylist === b.memberCanImportPlaylist
+}

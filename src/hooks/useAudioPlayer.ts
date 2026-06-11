@@ -1,4 +1,4 @@
-import { RefObject, useCallback, useRef } from "react"
+import { RefObject, useCallback, useMemo, useRef } from "react"
 import Shikwasa from "shikwasa2"
 import images from "../images"
 import time from "../utils/time"
@@ -160,6 +160,15 @@ export function useAudioPlayer(playerEl: RefObject<HTMLElement>) {
     playerRef.current.pause()
   }, [])
 
+  const setLocalPlaybackRate = useCallback((rate: number, fromRemote = false) => {
+    if (!Number.isFinite(rate) || rate <= 0) return
+    localPlaybackRateRef.current = rate
+    if (!playerRef.current) return
+    if (Number(playerRef.current.playbackRate) === rate) return
+    if (fromRemote) remoteFlagsRef.current.speed = true
+    playerRef.current.playbackRate = rate
+  }, [])
+
   const applyLocalPlaybackRate = useCallback(() => {
     if (!playerRef.current) return
     const rate = localPlaybackRateRef.current
@@ -169,7 +178,7 @@ export function useAudioPlayer(playerEl: RefObject<HTMLElement>) {
     }
   }, [])
 
-  return {
+  return useMemo(() => ({
     playerRef,
     srcDurationRef,
     playStatusRef,
@@ -180,8 +189,18 @@ export function useAudioPlayer(playerEl: RefObject<HTMLElement>) {
     seekByRemote,
     playByRemote,
     pauseByRemote,
+    setLocalPlaybackRate,
     applyLocalPlaybackRate,
-  }
+  }), [
+    applyLocalPlaybackRate,
+    createPlayer,
+    destroyPlayer,
+    pauseByRemote,
+    playByRemote,
+    seekByRemote,
+    setLocalPlaybackRate,
+    waitReady,
+  ])
 }
 
 export function getRemoteCurrentTime(newStatus: RoomStatus, srcDuration: number): number {
@@ -242,6 +261,7 @@ export function isSameQueueItems(a?: RoomQueue, b?: RoomQueue): boolean {
   if (!a || !b) return a === b
   if (a.currentIndex !== b.currentIndex) return false
   if ((a.currentItemId || "") !== (b.currentItemId || "")) return false
+  if (a.playMode !== b.playMode) return false
   if (a.items.length !== b.items.length) return false
   return a.items.every((item, index) => {
     const next = b.items[index]
@@ -272,21 +292,22 @@ function patchProgressDrag(container: HTMLElement | null, player: PlayerInstance
   const bar = container.querySelector<HTMLElement>(".shk-bar_wrap")
   if (!bar) return
   let dragging = false
-  const seekByClientX = (clientX: number) => {
-    if (!onBeforeClick("seek")) return
+  const previewByClientX = (clientX: number, commit: boolean) => {
     const duration = Number(player.duration || player.audio?.duration || 0)
     if (!Number.isFinite(duration) || duration <= 0) return
     const rect = bar.getBoundingClientRect()
     const percent = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-    player.seek(duration * percent)
+    const nextSec = duration * percent
+    updateProgressPreview(container, percent, nextSec)
+    if (commit) player.seek(nextSec)
   }
   const onPointerMove = (event: PointerEvent) => {
-    if (dragging) seekByClientX(event.clientX)
+    if (dragging) previewByClientX(event.clientX, false)
   }
   const onPointerUp = (event: PointerEvent) => {
     if (!dragging) return
     dragging = false
-    seekByClientX(event.clientX)
+    previewByClientX(event.clientX, true)
     window.removeEventListener("pointermove", onPointerMove, true)
     window.removeEventListener("pointerup", onPointerUp, true)
   }
@@ -294,11 +315,33 @@ function patchProgressDrag(container: HTMLElement | null, player: PlayerInstance
     if (event.button !== 0) return
     event.preventDefault()
     event.stopImmediatePropagation()
+    if (!onBeforeClick("seek")) return
     dragging = true
-    seekByClientX(event.clientX)
+    previewByClientX(event.clientX, false)
     window.addEventListener("pointermove", onPointerMove, true)
     window.addEventListener("pointerup", onPointerUp, true)
   }, true)
+}
+
+function updateProgressPreview(container: HTMLElement, percent: number, nextSec: number): void {
+  const played = container.querySelector<HTMLElement>(".shk-bar_played")
+  if (played) {
+    played.style.width = `${Math.round(percent * 10000) / 100}%`
+    played.setAttribute("aria-valuenow", String(percent))
+  }
+  const nowText = container.querySelector<HTMLElement>(".shk-time_now")
+  if (nowText) nowText.textContent = formatSecond(nextSec)
+}
+
+function formatSecond(value: number): string {
+  const sec = Math.max(0, Math.round(value))
+  const hour = Math.floor(sec / 3600)
+  const minute = Math.floor((sec - hour * 3600) / 60)
+  const second = sec - hour * 3600 - minute * 60
+  const mm = `${minute}`.padStart(2, "0")
+  const ss = `${second}`.padStart(2, "0")
+  if (hour <= 0) return `${mm}:${ss}`
+  return `${`${hour}`.padStart(2, "0")}:${mm}:${ss}`
 }
 
 function prevIcon(): string {

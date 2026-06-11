@@ -1,5 +1,5 @@
 import WebSocket from "ws"
-import type { PlaylistImportProgress, PtWebSocket, ResToFe, RoomPermissionConfig, RoomStatus } from "../types"
+import type { PlaylistImportProgress, PtWebSocket, ResToFe, RoomNotice, RoomPermissionConfig, RoomStatus } from "../types"
 
 interface RoomInfoPayload {
   roomId: string
@@ -50,6 +50,13 @@ class WebSocketBroadcaster {
     this.broadcastToRoom(roomId, {
       responseType: "PLAYLIST_IMPORT_PROGRESS",
       playlistImportProgress: progress
+    })
+  }
+
+  broadcastRoomNotice(roomId: string, notice: RoomNotice): void {
+    this.broadcastToRoom(roomId, {
+      responseType: "ROOM_NOTICE",
+      roomNotice: notice
     })
   }
 

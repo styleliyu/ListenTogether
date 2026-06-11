@@ -4,6 +4,7 @@ import type { Room } from "./types"
 import { getOwnerGuestId, normalizeRoomConfig, resolveOwnerAfterParticipants } from "./permissionService"
 import { broadcaster } from "./websocket/broadcaster"
 import { clearRoomChatHistory } from "./chatService"
+import { appendRoomNotice, clearRoomNoticeHistory } from "./roomNoticeService"
 
 export function startRoomClock(intervalMs: number): NodeJS.Timeout {
   const run = async () => {
@@ -34,6 +35,7 @@ async function handleRoomClock(): Promise<void> {
 
     const oldLen = participants.length
     const offlineBefore = now - env.visitorOfflineTimeoutMs
+    const removedParticipants = participants.filter(person => person.heartbeatStamp <= offlineBefore)
     participants = participants.filter(person => {
       if (person.heartbeatStamp > lastHeartbeat) lastHeartbeat = person.heartbeatStamp
       return person.heartbeatStamp > offlineBefore
@@ -61,6 +63,14 @@ async function handleRoomClock(): Promise<void> {
         permissions: config.permissions
       })
     }
+    for (const person of removedParticipants) {
+      const notice = appendRoomNotice({
+        roomId: room._id,
+        type: "member",
+        content: `${person.nickName || "成员"} 离开房间`
+      })
+      broadcaster.broadcastRoomNotice(room._id, notice)
+    }
   }
 }
 
@@ -79,7 +89,10 @@ async function handleEmptyRoom(room: Room, now: number): Promise<void> {
 
   if (Object.keys(patch).length > 0) {
     await roomRepo.update(room._id, patch)
-    if (patch.oState === "DELETED") clearRoomChatHistory(room._id)
+    if (patch.oState === "DELETED") {
+      clearRoomChatHistory(room._id)
+      clearRoomNoticeHistory(room._id)
+    }
   }
 }
 

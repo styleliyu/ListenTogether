@@ -1,12 +1,15 @@
 import { roomRepo } from "./repositories"
 import { getPlaylistImportData, resolveQueueItemContent, toPlayableQueueItem } from "./music/musicAdapter"
 import { normalizeQueue, reconcileQueueCurrent } from "./queueService"
+import { appendRoomNotice } from "./roomNoticeService"
 import type { ContentData, FailedTrack, PlaylistImportProgress, QueueItem, RequestRes, ResToFe, Room, RoomQueue } from "./types"
 
 const IMPORT_DELAY_MIN_MS = 800
 const IMPORT_DELAY_MAX_MS = 1500
 const MAX_FAILED_TRACK_DETAILS = 50
 const MAX_RAW_REASON_LENGTH = 200
+const QUEUE_STATUS_BROADCAST_INTERVAL_MS = 5000
+const QUEUE_STATUS_BROADCAST_BATCH_SIZE = 10
 
 // Playlist import owns progressive parsing, cancellation, progress broadcasts,
 // and failedTracks details. It must never append to deleted rooms.
@@ -22,6 +25,8 @@ interface PlaylistImportJob {
   running: boolean
   cancelled: boolean
   importedIds: Set<string>
+  lastQueueBroadcastAt: number
+  addedSinceQueueBroadcast: number
 }
 
 type RoomBroadcaster = (roomId: string, data: ResToFe) => void
@@ -81,7 +86,9 @@ export function startPlaylistImport(input: {
     addedCount: initialCount,
     running: true,
     cancelled: false,
-    importedIds
+    importedIds,
+    lastQueueBroadcastAt: 0,
+    addedSinceQueueBroadcast: 0
   }
 
   activeJobs.set(input.roomId, job)
@@ -90,6 +97,7 @@ export function startPlaylistImport(input: {
     "started",
     job.successCount > 0 ? `已加入 ${job.addedCount} 首，剩余歌曲后台加载中` : "正在导入歌单"
   )
+  broadcastNotice(job.roomId, "开始导入歌单")
   void runPlaylistImport(job, input.items)
   return toProgress(job, "started", "歌单已开始导入")
 }
@@ -121,6 +129,7 @@ export function cancelPlaylistImport(roomId: string): RequestRes<PlaylistImportP
     responseType: "PLAYLIST_IMPORT_PROGRESS",
     playlistImportProgress: progress
   })
+  broadcastNotice(roomId, `导入已取消：已加入 ${job.addedCount} 首，失败 ${job.failedCount} 首`)
   return {
     code: "0000",
     showMsg: "已取消导入任务",
@@ -183,8 +192,8 @@ async function runPlaylistImport(job: PlaylistImportJob, items: QueueItem[]): Pr
           job.importedIds.add(item.id)
           job.successCount += 1
           job.addedCount += 1
-          const latest = await roomRepo.get(job.roomId)
-          if (latest?.queue) broadcastQueue(job.roomId, latest)
+          job.addedSinceQueueBroadcast += 1
+          await maybeBroadcastQueue(job)
         } else {
           job.importedIds.add(item.id)
           job.successCount += 1
@@ -199,7 +208,9 @@ async function runPlaylistImport(job: PlaylistImportJob, items: QueueItem[]): Pr
 
     if (!job.cancelled && await isRoomImportable(job.roomId)) {
       job.running = false
+      await maybeBroadcastQueue(job, true)
       broadcastProgress(job, "completed", `导入完成：成功 ${job.successCount} 首，失败 ${job.failedCount} 首`)
+      broadcastNotice(job.roomId, `导入完成：成功 ${job.successCount} 首，失败 ${job.failedCount} 首`)
     }
   } finally {
     activeJobs.delete(job.roomId)
@@ -244,6 +255,28 @@ function broadcastProgress(job: PlaylistImportJob, status: PlaylistImportProgres
   broadcastToRoom(job.roomId, {
     responseType: "PLAYLIST_IMPORT_PROGRESS",
     playlistImportProgress: toProgress(job, status, message)
+  })
+}
+
+async function maybeBroadcastQueue(job: PlaylistImportJob, force = false): Promise<void> {
+  if (!force) {
+    const now = Date.now()
+    const withinInterval = now - job.lastQueueBroadcastAt < QUEUE_STATUS_BROADCAST_INTERVAL_MS
+    if (withinInterval && job.addedSinceQueueBroadcast < QUEUE_STATUS_BROADCAST_BATCH_SIZE) return
+  }
+
+  if (job.addedSinceQueueBroadcast < 1 && !force) return
+  const latest = await roomRepo.get(job.roomId)
+  if (latest?.queue) broadcastQueue(job.roomId, latest)
+  job.lastQueueBroadcastAt = Date.now()
+  job.addedSinceQueueBroadcast = 0
+}
+
+function broadcastNotice(roomId: string, content: string): void {
+  const notice = appendRoomNotice({ roomId, type: "playlist_import", content })
+  broadcastToRoom(roomId, {
+    responseType: "ROOM_NOTICE",
+    roomNotice: notice
   })
 }
 

@@ -16,6 +16,7 @@ import { env } from "./config/env"
 import { broadcaster } from "./websocket/broadcaster"
 import { normalizeQueue } from "./queueService"
 import { clearRoomChatHistory } from "./chatService"
+import { appendRoomNotice, clearRoomNoticeHistory } from "./roomNoticeService"
 import {
   DEFAULT_ROOM_CONFIG,
   assertRoomPermission,
@@ -89,6 +90,7 @@ async function handleSetRoomName(body: CommonBody): Promise<RequestRes<RoRes>> {
     roomId,
     roomName
   })
+  broadcastRoomNotice(roomId, "system", `房间名称改为：${roomName}`)
   return { code: "0000", data: toRoRes(next || { ...room, roomName }) }
 }
 
@@ -100,6 +102,7 @@ async function handleDeleteRoom(body: CommonBody): Promise<RequestRes<RoRes>> {
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") {
     clearRoomChatHistory(roomId)
+    clearRoomNoticeHistory(roomId)
     return { code: "0000" }
   }
   if (room.owner !== clientId) return { code: "E4003" }
@@ -107,6 +110,7 @@ async function handleDeleteRoom(body: CommonBody): Promise<RequestRes<RoRes>> {
 
   stopPlaylistImportForRoom(roomId)
   clearRoomChatHistory(roomId)
+  clearRoomNoticeHistory(roomId)
   await roomRepo.update(roomId, {
     oState: "DELETED",
     playStatus: "PAUSED",
@@ -132,6 +136,7 @@ async function handleSetRoomPermissions(body: CommonBody): Promise<RequestRes<Ro
   const config = normalizeRoomConfig({ ...room.config, permissions })
   const next = await roomRepo.update(roomId, { config }) || { ...room, config }
   broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
+  broadcastRoomNotice(roomId, "permission", "房间权限已更新")
   return { code: "0000", data: toRoRes(next, getGuestIdByClientId(next, clientId), "Y") }
 }
 
@@ -155,6 +160,7 @@ async function handleTransferOwner(body: CommonBody): Promise<RequestRes<RoRes>>
 
   const next = await roomRepo.update(roomId, { owner: target.nonce }) || { ...room, owner: target.nonce }
   broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
+  broadcastRoomNotice(roomId, "permission", `${target.nickName || "成员"} 成为新房主`)
   return { code: "0000", data: toRoRes(next, getGuestIdByClientId(next, clientId), "N") }
 }
 
@@ -175,6 +181,7 @@ async function handleLeave(body: CommonBody): Promise<RequestRes<RoRes>> {
     room.participants = []
     room.emptyStamp = Date.now()
     await roomRepo.update(roomId, room)
+    appendRoomNotice({ roomId, type: "member", content: `${me.nickName || "成员"} 离开房间` })
     return { code: "0000" }
   }
 
@@ -182,6 +189,11 @@ async function handleLeave(body: CommonBody): Promise<RequestRes<RoRes>> {
   const owner = resolveOwnerAfterParticipants(room, participants)
   const next = await roomRepo.update(roomId, { participants, owner }) || { ...room, participants, owner }
   if (owner !== room.owner) broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
+  broadcastRoomNotice(roomId, "member", `${me.nickName || "成员"} 离开房间`)
+  if (owner !== room.owner) {
+    const ownerName = next.participants.find(person => person.nonce === owner)?.nickName || "成员"
+    broadcastRoomNotice(roomId, "permission", `${ownerName} 成为新房主`)
+  }
   return { code: "0000" }
 }
 
@@ -228,6 +240,7 @@ async function handleEnter(
   let participants = room.participants || []
   let guestId = ""
   let me = participants.find(v => v.nonce === clientId)
+  const isNewParticipant = !me
 
   if (me) {
     guestId = me.guestId
@@ -255,6 +268,11 @@ async function handleEnter(
   await recordVisitor(body, ua, ip)
   const next = await roomRepo.update(roomId, { participants, owner, emptyStamp: undefined }) || { ...room, participants, owner }
   if (owner !== room.owner) broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
+  if (isNewParticipant) broadcastRoomNotice(roomId, "member", `${me?.nickName || "成员"} 加入房间`)
+  if (owner !== room.owner) {
+    const ownerName = next.participants.find(person => person.nonce === owner)?.nickName || "成员"
+    broadcastRoomNotice(roomId, "permission", `${ownerName} 成为新房主`)
+  }
 
   return {
     code: "0000",
@@ -398,6 +416,13 @@ function buildRoomInfo(room: Room): NonNullable<import("./types").ResToFe["roomI
     everyoneCanOperatePlayer: config.everyoneCanOperatePlayer,
     permissions: config.permissions
   }
+}
+
+function broadcastRoomNotice(roomId: string, type: import("./types").RoomNoticeType, content: string): void {
+  const text = content.trim()
+  if (!text) return
+  const notice = appendRoomNotice({ roomId, type, content: text })
+  broadcaster.broadcastRoomNotice(roomId, notice)
 }
 
 function getGuestIdByClientId(room: Room, clientId: string): string | undefined {

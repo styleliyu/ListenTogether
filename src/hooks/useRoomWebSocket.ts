@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useCallback, useMemo, useRef } from "react"
 import util from "../utils/util"
 import type { WsMsgRes } from "../types"
 
@@ -50,5 +50,5 @@ export function useRoomWebSocket() {
     }
   }, [])
 
-  return { wsRef, connect, close, send }
+  return useMemo(() => ({ wsRef, connect, close, send }), [close, connect, send])
 }
