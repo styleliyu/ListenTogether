@@ -75,7 +75,7 @@ export async function handleRoomOperate(ctx: RequestContext): Promise<RequestRes
 async function handleSetRoomName(body: CommonBody): Promise<RequestRes<RoRes>> {
   const clientId = body["x-pt-local-id"]
   const { roomId } = body
-  const room = roomRepo.get(roomId)
+  const room = await roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") return { code: "E4004" }
@@ -84,7 +84,7 @@ async function handleSetRoomName(body: CommonBody): Promise<RequestRes<RoRes>> {
   const roomName = sanitizeRoomName(body.roomName)
   if (!roomName) return { code: "E4000", showMsg: "房间名称不能为空" }
 
-  const next = roomRepo.update(roomId, { roomName })
+  const next = await roomRepo.update(roomId, { roomName })
   broadcaster.broadcastRoomInfo(roomId, {
     roomId,
     roomName
@@ -95,7 +95,7 @@ async function handleSetRoomName(body: CommonBody): Promise<RequestRes<RoRes>> {
 async function handleDeleteRoom(body: CommonBody): Promise<RequestRes<RoRes>> {
   const clientId = body["x-pt-local-id"]
   const { roomId } = body
-  const room = roomRepo.get(roomId)
+  const room = await roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") {
@@ -107,7 +107,7 @@ async function handleDeleteRoom(body: CommonBody): Promise<RequestRes<RoRes>> {
 
   stopPlaylistImportForRoom(roomId)
   clearRoomChatHistory(roomId)
-  roomRepo.update(roomId, {
+  await roomRepo.update(roomId, {
     oState: "DELETED",
     playStatus: "PAUSED",
     participants: [],
@@ -120,7 +120,7 @@ async function handleDeleteRoom(body: CommonBody): Promise<RequestRes<RoRes>> {
 async function handleSetRoomPermissions(body: CommonBody): Promise<RequestRes<RoRes>> {
   const clientId = body["x-pt-local-id"]
   const { roomId } = body
-  const room = roomRepo.get(roomId)
+  const room = await roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") return { code: "E4004" }
@@ -130,7 +130,7 @@ async function handleSetRoomPermissions(body: CommonBody): Promise<RequestRes<Ro
 
   const permissions = sanitizeRoomPermissions(body.permissions, room.config)
   const config = normalizeRoomConfig({ ...room.config, permissions })
-  const next = roomRepo.update(roomId, { config }) || { ...room, config }
+  const next = await roomRepo.update(roomId, { config }) || { ...room, config }
   broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
   return { code: "0000", data: toRoRes(next, getGuestIdByClientId(next, clientId), "Y") }
 }
@@ -138,7 +138,7 @@ async function handleSetRoomPermissions(body: CommonBody): Promise<RequestRes<Ro
 async function handleTransferOwner(body: CommonBody): Promise<RequestRes<RoRes>> {
   const clientId = body["x-pt-local-id"]
   const { roomId } = body
-  const room = roomRepo.get(roomId)
+  const room = await roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") return { code: "E4004" }
@@ -153,7 +153,7 @@ async function handleTransferOwner(body: CommonBody): Promise<RequestRes<RoRes>>
   if (!target) return { code: "E4004", showMsg: "目标成员不在当前房间" }
   if (target.nonce === clientId) return { code: "E4000", showMsg: "不能转让给自己" }
 
-  const next = roomRepo.update(roomId, { owner: target.nonce }) || { ...room, owner: target.nonce }
+  const next = await roomRepo.update(roomId, { owner: target.nonce }) || { ...room, owner: target.nonce }
   broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
   return { code: "0000", data: toRoRes(next, getGuestIdByClientId(next, clientId), "N") }
 }
@@ -161,7 +161,7 @@ async function handleTransferOwner(body: CommonBody): Promise<RequestRes<RoRes>>
 async function handleLeave(body: CommonBody): Promise<RequestRes<RoRes>> {
   const clientId = body["x-pt-local-id"]
   const { roomId } = body
-  let room = roomRepo.get(roomId)
+  let room = await roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") return { code: "E4004" }
@@ -174,13 +174,13 @@ async function handleLeave(body: CommonBody): Promise<RequestRes<RoRes>> {
     room = pausePlayer(room)
     room.participants = []
     room.emptyStamp = Date.now()
-    roomRepo.update(roomId, room)
+    await roomRepo.update(roomId, room)
     return { code: "0000" }
   }
 
   const participants = room.participants.filter(v => v.nonce !== clientId)
   const owner = resolveOwnerAfterParticipants(room, participants)
-  const next = roomRepo.update(roomId, { participants, owner }) || { ...room, participants, owner }
+  const next = await roomRepo.update(roomId, { participants, owner }) || { ...room, participants, owner }
   if (owner !== room.owner) broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
   return { code: "0000" }
 }
@@ -188,7 +188,7 @@ async function handleLeave(body: CommonBody): Promise<RequestRes<RoRes>> {
 async function handleHeartbeat(body: CommonBody): Promise<RequestRes<RoRes>> {
   const clientId = body["x-pt-local-id"]
   const { roomId, nickName } = body
-  const room = roomRepo.get(roomId)
+  const room = await roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") return { code: "E4004" }
@@ -204,7 +204,7 @@ async function handleHeartbeat(body: CommonBody): Promise<RequestRes<RoRes>> {
   participants = participants.filter(v => now - v.heartbeatStamp < env.visitorOfflineTimeoutMs)
   const owner = resolveOwnerAfterParticipants(room, participants)
 
-  const next = roomRepo.update(roomId, { participants, owner }) || { ...room, participants, owner }
+  const next = await roomRepo.update(roomId, { participants, owner }) || { ...room, participants, owner }
   if (owner !== room.owner) broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
   return {
     code: "0000",
@@ -219,7 +219,7 @@ async function handleEnter(
 ): Promise<RequestRes<RoRes>> {
   const clientId = body["x-pt-local-id"]
   const { roomId, nickName } = body
-  const room = roomRepo.get(roomId)
+  const room = await roomRepo.get(roomId)
   if (!room || !room._id) return { code: "E4004" }
   if (room.oState === "EXPIRED") return { code: "E4006" }
   if (room.oState === "DELETED") return { code: "E4004" }
@@ -253,7 +253,7 @@ async function handleEnter(
   participants = participants.filter(v => now - v.heartbeatStamp < env.visitorOfflineTimeoutMs)
   const owner = resolveOwnerAfterParticipants(room, participants)
   await recordVisitor(body, ua, ip)
-  const next = roomRepo.update(roomId, { participants, owner, emptyStamp: undefined }) || { ...room, participants, owner }
+  const next = await roomRepo.update(roomId, { participants, owner, emptyStamp: undefined }) || { ...room, participants, owner }
   if (owner !== room.owner) broadcaster.broadcastRoomInfo(roomId, buildRoomInfo(next))
 
   return {
@@ -287,7 +287,7 @@ async function handleCreate(
     isPersistent: Boolean(body.isPersistent),
     roomName: sanitizeRoomName(body.roomName)
   }
-  const roomId = roomRepo.add(room)
+  const roomId = await roomRepo.add(room)
   if (body.roomData.pendingPlaylistImport) {
     startPlaylistImport({
       roomId,
@@ -456,7 +456,7 @@ async function recordVisitor(
   const nonce = body["x-pt-local-id"]
   const nickName = body.nickName || ""
   const now = Date.now()
-  const existing = visitorRepo.getByNonce(nonce)
+  const existing = await visitorRepo.getByNonce(nonce)
 
   if (existing) {
     const next: Visitor = {
@@ -471,11 +471,11 @@ async function recordVisitor(
       next.enterRoomStamp = now
       next.enterNum += 1
     }
-    visitorRepo.update(next._id, next)
+    await visitorRepo.update(next._id, next)
     return true
   }
 
-  visitorRepo.add({
+  await visitorRepo.add({
     nickName,
     enterRoomStamp: operateType === "ENTER" ? now : -1,
     enterNum: operateType === "ENTER" ? 1 : 0,

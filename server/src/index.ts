@@ -6,11 +6,10 @@ import { handleParseText } from "./parseText"
 import { handleRoomOperate } from "./roomService"
 import { startRoomClock } from "./clock"
 import { setupWebSocket } from "./websocket"
-import { dbPath } from "./db"
 import { getUploadRoot, handleUploadAudio, handleUploadError, uploadMiddleware } from "./upload"
 import { cancelPlaylistImport } from "./playlistImport"
 import { env } from "./config/env"
-import { roomRepo } from "./repositories"
+import { checkDatabaseHealth, initializeDatabase, roomRepo } from "./repositories"
 import { canImportPlaylist } from "./permissionService"
 
 const app = express()
@@ -26,8 +25,20 @@ app.use("/uploads", express.static(getUploadRoot(), {
   }
 }))
 
-app.get("/health", (_req, res) => {
-  res.json({ code: "0000", data: { status: "ok" } })
+app.get("/health", async (_req, res) => {
+  try {
+    await checkDatabaseHealth()
+    res.json({ code: "0000", data: { status: "ok", databaseProvider: env.databaseProvider } })
+  } catch (err) {
+    res.status(503).json({
+      code: "E5000",
+      data: {
+        status: "error",
+        databaseProvider: env.databaseProvider,
+        message: err instanceof Error ? err.message : "database health check failed"
+      }
+    })
+  }
 })
 
 app.post("/api/pt-service", (req, res) => {
@@ -51,7 +62,7 @@ app.post("/api/parse-text", async (req, res) => {
 app.post("/api/upload-audio", uploadMiddleware, handleUploadAudio)
 app.use(handleUploadError)
 
-app.post("/api/playlist-import/cancel", (req, res) => {
+app.post("/api/playlist-import/cancel", async (req, res) => {
   const roomId = typeof req.body?.roomId === "string" ? req.body.roomId : ""
   const clientId = typeof req.body?.["x-pt-local-id"] === "string" ? req.body["x-pt-local-id"] : ""
   if (!roomId) {
@@ -63,7 +74,7 @@ app.post("/api/playlist-import/cancel", (req, res) => {
     return
   }
 
-  const room = roomRepo.get(roomId)
+  const room = await roomRepo.get(roomId)
   if (!room || room.oState === "DELETED") {
     res.json({ code: "E4004", message: "房间不存在" })
     return
@@ -99,11 +110,23 @@ app.use("/api", (_req, res) => {
   res.status(404).json({ code: "E4044" })
 })
 
-const server = http.createServer(app)
-setupWebSocket(server)
-startRoomClock(env.roomCleanupIntervalMs)
+async function main(): Promise<void> {
+  await initializeDatabase()
 
-server.listen(port, host, () => {
-  console.log(`podcast-together API listening on http://${host}:${port}`)
-  console.log(`SQLite database: ${dbPath}`)
+  const server = http.createServer(app)
+  setupWebSocket(server)
+  startRoomClock(env.roomCleanupIntervalMs)
+
+  server.listen(port, host, () => {
+    console.log(`podcast-together API listening on http://${host}:${port}`)
+    console.log(`Database provider: ${env.databaseProvider}`)
+    if (env.databaseProvider === "sqlite") {
+      console.log(`SQLite database: ${env.databasePath}`)
+    }
+  })
+}
+
+void main().catch(err => {
+  console.error("failed to start server", err)
+  process.exit(1)
 })

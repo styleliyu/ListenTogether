@@ -23,13 +23,13 @@
 - 状态管理：Zustand。
 - 实时通信：原生 WebSocket。
 - 后端：Node.js + Express + ws。
-- 数据库：SQLite，运行时数据默认保存在 `server/data/`。
+- 数据库：默认 SQLite，后端也支持可选 PostgreSQL provider。
 
-当前版本继续使用 SQLite 保存房间与访客状态。未来计划单独设计 PostgreSQL 迁移，包括 schema 设计、迁移脚本、回滚方案和部署配置。
+当前默认仍使用 SQLite 保存房间与访客状态，运行时数据默认保存在 `server/data/`。如果配置 `DATABASE_PROVIDER=postgres`，后端会使用 PostgreSQL repository，并在空库启动时自动执行基础 schema 初始化。
 
 房间聊天记录当前只以内存保存每个房间最近 50 条消息，服务重启后聊天历史会丢失。当前聊天室允许房间内成员发送文字消息，并带有基础防刷屏限制；后续可扩展聊天权限开关。
 
-PostgreSQL 迁移仍处于前置准备阶段，当前版本没有连接或支持 PostgreSQL。迁移草案见 [docs/postgres-migration.md](./docs/postgres-migration.md)。后端提供只读 dry-run 检查脚本：
+PostgreSQL 支持是可选 provider，不代表生产环境已经切换。当前 SQLite 源库如果没有需要保留的数据，可以直接使用空 PostgreSQL 数据库启动；如果未来需要迁移旧 SQLite 数据，仍建议先运行 dry-run 检查脚本。迁移说明见 [docs/postgres-migration.md](./docs/postgres-migration.md)。后端提供只读 dry-run 检查脚本：
 
 ```bash
 cd server
@@ -70,10 +70,23 @@ VITE_HEARTBEAT_PERIOD=15
 ```env
 HOST=127.0.0.1
 PORT=3001
-DATABASE_PATH=./data/podcast-together.db
+DATABASE_PROVIDER=sqlite
+SQLITE_DB_PATH=./data/podcast-together.db
 CORS_ORIGIN=http://127.0.0.1:5173
 UPLOAD_DIR=./data/uploads
 ```
+
+PostgreSQL 可选配置示例：
+
+```env
+DATABASE_PROVIDER=postgres
+DATABASE_URL=postgresql://user:password@localhost:5432/allcanlisten
+PG_POOL_MAX=10
+PG_IDLE_TIMEOUT_MS=30000
+PG_CONNECTION_TIMEOUT_MS=5000
+```
+
+不要提交真实数据库密码。`DATABASE_URL` 只在 `DATABASE_PROVIDER=postgres` 时必需。
 
 QQ 音乐 Cookie 和喜马拉雅开放平台密钥只应放在服务端环境变量或运行时文件里，不要提交到仓库。
 

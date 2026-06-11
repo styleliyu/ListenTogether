@@ -149,7 +149,7 @@ async function runPlaylistImport(job: PlaylistImportJob, items: QueueItem[]): Pr
       if (job.cancelled || !job.running) break
       if (job.importedIds.has(item.id)) continue
 
-      const room = roomRepo.get(job.roomId)
+      const room = await roomRepo.get(job.roomId)
       if (!room || room.oState !== "OK") break
       if (roomHasQueueItem(room, item)) {
         job.importedIds.add(item.id)
@@ -162,12 +162,12 @@ async function runPlaylistImport(job: PlaylistImportJob, items: QueueItem[]): Pr
 
       await sleep(randomDelay())
       if (job.cancelled || !job.running) break
-      if (!isRoomImportable(job.roomId)) break
+      if (!await isRoomImportable(job.roomId)) break
 
       try {
         const content = await resolveQueueItemContent(item)
         if (job.cancelled || !job.running) break
-        if (!isRoomImportable(job.roomId)) break
+        if (!await isRoomImportable(job.roomId)) break
 
         job.parsedCount += 1
         if (!content?.audioUrl) {
@@ -177,13 +177,13 @@ async function runPlaylistImport(job: PlaylistImportJob, items: QueueItem[]): Pr
         }
 
         const playable = toPlayableQueueItem(item, content)
-        const appended = appendQueueItem(job.roomId, playable)
-        if (!isRoomImportable(job.roomId)) break
+        const appended = await appendQueueItem(job.roomId, playable)
+        if (!await isRoomImportable(job.roomId)) break
         if (appended) {
           job.importedIds.add(item.id)
           job.successCount += 1
           job.addedCount += 1
-          const latest = roomRepo.get(job.roomId)
+          const latest = await roomRepo.get(job.roomId)
           if (latest?.queue) broadcastQueue(job.roomId, latest)
         } else {
           job.importedIds.add(item.id)
@@ -197,7 +197,7 @@ async function runPlaylistImport(job: PlaylistImportJob, items: QueueItem[]): Pr
       }
     }
 
-    if (!job.cancelled && isRoomImportable(job.roomId)) {
+    if (!job.cancelled && await isRoomImportable(job.roomId)) {
       job.running = false
       broadcastProgress(job, "completed", `导入完成：成功 ${job.successCount} 首，失败 ${job.failedCount} 首`)
     }
@@ -206,8 +206,8 @@ async function runPlaylistImport(job: PlaylistImportJob, items: QueueItem[]): Pr
   }
 }
 
-function appendQueueItem(roomId: string, item: QueueItem): boolean {
-  const room = roomRepo.get(roomId)
+async function appendQueueItem(roomId: string, item: QueueItem): Promise<boolean> {
+  const room = await roomRepo.get(roomId)
   if (!room || room.oState !== "OK") return false
 
   const baseQueue: RoomQueue = normalizeQueue(room.queue)
@@ -217,7 +217,7 @@ function appendQueueItem(roomId: string, item: QueueItem): boolean {
 
   const queue = reconcileQueueCurrent(baseQueue, { ...baseQueue, items: [...baseQueue.items, item] })
 
-  roomRepo.update(roomId, { queue })
+  await roomRepo.update(roomId, { queue })
   return true
 }
 
@@ -241,19 +241,14 @@ function broadcastQueue(roomId: string, room: Room): void {
 }
 
 function broadcastProgress(job: PlaylistImportJob, status: PlaylistImportProgress["status"], message: string): void {
-  if (!isRoomImportable(job.roomId)) {
-    job.cancelled = true
-    job.running = false
-    return
-  }
   broadcastToRoom(job.roomId, {
     responseType: "PLAYLIST_IMPORT_PROGRESS",
     playlistImportProgress: toProgress(job, status, message)
   })
 }
 
-function isRoomImportable(roomId: string): boolean {
-  const room = roomRepo.get(roomId)
+async function isRoomImportable(roomId: string): Promise<boolean> {
+  const room = await roomRepo.get(roomId)
   return Boolean(room && room.oState === "OK")
 }
 

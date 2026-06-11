@@ -1,6 +1,26 @@
-# PostgreSQL 迁移草案与 dry-run 检查
+# PostgreSQL Provider 与 dry-run 检查
 
-本文档是 PostgreSQL 迁移前置设计草案。当前阶段不切换数据库，不连接 PostgreSQL，不执行 SQL，不修改 SQLite schema 或数据文件。
+本文档记录 PostgreSQL provider 的当前实现边界和迁移注意事项。当前默认仍为 SQLite；只有显式设置 `DATABASE_PROVIDER=postgres` 时才连接 PostgreSQL 并初始化 schema。不修改 SQLite schema 或数据文件。
+
+## Provider 配置
+
+后端通过环境变量选择数据库实现：
+
+```env
+DATABASE_PROVIDER=sqlite
+SQLITE_DB_PATH=./data/podcast-together.db
+DATABASE_PATH=./data/podcast-together.db
+DATABASE_URL=postgresql://user:password@localhost:5432/allcanlisten
+PG_POOL_MAX=10
+PG_IDLE_TIMEOUT_MS=30000
+PG_CONNECTION_TIMEOUT_MS=5000
+```
+
+- `DATABASE_PROVIDER` 支持 `sqlite` 和 `postgres`，默认 `sqlite`。
+- SQLite 模式优先读取 `SQLITE_DB_PATH`，仍兼容旧 `DATABASE_PATH`。
+- `DATABASE_URL` 只在 `DATABASE_PROVIDER=postgres` 时必需。
+- PostgreSQL 模式允许空库启动，服务启动时会执行 `server/src/db/postgres/schema.sql`。
+- 当前没有执行 SQLite 到 PostgreSQL 的数据迁移；如果旧 SQLite 数据需要保留，应先运行 dry-run 检查。
 
 ## 当前 SQLite 状态
 
@@ -20,96 +40,27 @@
 - 聊天室当前为内存态，由 `chatService.ts` 中的 `roomChatHistories` 保存，不在 SQLite 中。
 - playlist import jobs 当前为内存态，由 `playlistImport.ts` 中的 `activeJobs` 保存，不在 SQLite 中。
 
-## PostgreSQL schema 草案
+## PostgreSQL schema
 
-以下 SQL 仅为草案，不应在当前阶段执行。首版迁移建议保留 JSONB 边界，避免过度拆分业务对象。
+实际初始化 SQL 位于：
 
-```sql
-CREATE TABLE rooms (
-  id TEXT PRIMARY KEY,
-  owner_client_id TEXT NOT NULL,
-  state TEXT NOT NULL CHECK (state IN ('OK', 'EXPIRED', 'DELETED')),
-  play_status TEXT NOT NULL CHECK (play_status IN ('PLAYING', 'PAUSED')),
-  speed_rate TEXT NOT NULL,
-  room_name TEXT,
-  content JSONB NOT NULL,
-  permissions JSONB NOT NULL,
-  current_item_id TEXT,
-  current_index INTEGER,
-  play_mode TEXT,
-  content_stamp_ms BIGINT NOT NULL,
-  operate_stamp_ms BIGINT NOT NULL,
-  operator_guest_id TEXT,
-  created_at BIGINT NOT NULL,
-  empty_at BIGINT,
-  is_persistent BOOLEAN NOT NULL DEFAULT FALSE,
-  legacy_room_json JSONB NOT NULL
-);
-
-CREATE INDEX idx_rooms_owner_state ON rooms(owner_client_id, state);
-CREATE INDEX idx_rooms_play_state ON rooms(play_status, state);
-CREATE INDEX idx_rooms_created_at ON rooms(created_at);
-
-CREATE TABLE visitors (
-  id TEXT PRIMARY KEY,
-  nonce TEXT NOT NULL UNIQUE,
-  nick_name TEXT,
-  enter_room_stamp_ms BIGINT,
-  enter_num INTEGER NOT NULL DEFAULT 0,
-  create_num INTEGER NOT NULL DEFAULT 0,
-  create_room_stamp_ms BIGINT,
-  create_stamp_ms BIGINT NOT NULL,
-  user_agent TEXT,
-  ip JSONB,
-  legacy_visitor_json JSONB NOT NULL
-);
-
-CREATE TABLE room_members (
-  room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-  guest_id TEXT NOT NULL,
-  client_id TEXT NOT NULL,
-  nick_name TEXT,
-  enter_stamp_ms BIGINT NOT NULL,
-  heartbeat_stamp_ms BIGINT NOT NULL,
-  user_agent TEXT,
-  is_owner BOOLEAN NOT NULL DEFAULT FALSE,
-  PRIMARY KEY (room_id, guest_id),
-  UNIQUE (room_id, client_id)
-);
-
-CREATE INDEX idx_room_members_room_client ON room_members(room_id, client_id);
-
-CREATE TABLE room_queue_items (
-  room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-  item_id TEXT NOT NULL,
-  position INTEGER NOT NULL,
-  source_type TEXT NOT NULL,
-  title TEXT NOT NULL,
-  artist TEXT,
-  image_url TEXT,
-  link_url TEXT,
-  resource_id TEXT,
-  audio_url TEXT,
-  raw_item JSONB NOT NULL,
-  PRIMARY KEY (room_id, item_id),
-  UNIQUE (room_id, position)
-);
-
-CREATE INDEX idx_room_queue_items_room_position ON room_queue_items(room_id, position);
-
-CREATE TABLE room_chat_messages (
-  id TEXT PRIMARY KEY,
-  room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-  sender_guest_id TEXT NOT NULL,
-  sender_name TEXT,
-  content TEXT NOT NULL,
-  created_at BIGINT NOT NULL
-);
-
-CREATE INDEX idx_room_chat_messages_room_created ON room_chat_messages(room_id, created_at);
+```bash
+server/src/db/postgres/schema.sql
 ```
 
-可选后续表：
+首版实现保留 JSONB 边界，避免过度拆分业务对象。`rooms.legacy_data` 和 `visitors.legacy_data` 是读取时恢复完整业务对象的事实来源，结构化列用于索引、健康检查和后续迁移演进。
+
+当前实际创建的表：
+
+- `rooms`
+- `visitors`
+- `room_members`
+- `room_queue_items`
+- `room_chat_messages`
+
+`playlist_import_jobs`、`playlist_import_failed_tracks` 和 `room_events` 本阶段不创建。聊天室运行时逻辑仍使用内存历史；`room_chat_messages` 只是为后续持久化预留。
+
+未在本阶段创建的后续可选表：
 
 ```sql
 CREATE TABLE playlist_import_jobs (
@@ -156,18 +107,18 @@ CREATE TABLE room_events (
 | `rooms.play_status` | `rooms.play_status` | 对应 `Room.playStatus` |
 | `rooms.create_stamp` | `rooms.created_at` | 当前为毫秒时间戳 |
 | `rooms.data.content` | `rooms.content` | 先用 JSONB 保存 |
-| `rooms.data.config` | `rooms.permissions` | 先用 JSONB 保存 normalized permissions |
+| `rooms.data.config` | `rooms.permissions` | 先用 JSONB 保存权限配置 |
 | `rooms.data.queue.currentItemId` | `rooms.current_item_id` | 必须保留 |
 | `rooms.data.queue.currentIndex` | `rooms.current_index` | 必须保留 |
 | `rooms.data.queue.playMode` | `rooms.play_mode` | 播放模式 |
 | `rooms.data.queue.items` | `room_queue_items` | 数组顺序生成 `position` |
 | `rooms.data.participants` | `room_members` | `nonce` 映射为 `client_id`，`guestId` 映射为 `guest_id` |
 | `rooms.data.isPersistent` | `rooms.is_persistent` | 缺失时默认 `false` |
-| `rooms.data.emptyStamp` | `rooms.empty_at` | 当前为毫秒时间戳 |
-| `rooms.data` | `rooms.legacy_room_json` | 首版保留完整 JSON 便于回滚和校验 |
+| `rooms.data.emptyStamp` | `rooms.empty_stamp` | 当前为毫秒时间戳 |
+| `rooms.data` | `rooms.legacy_data` | 首版保留完整 JSON 便于回滚和校验 |
 | `visitors.id` | `visitors.id` | 访客主键 |
 | `visitors.nonce` | `visitors.nonce` | 全局 clientId |
-| `visitors.data` | `visitors.*` + `visitors.legacy_visitor_json` | 结构化字段加完整 JSON |
+| `visitors.data` | `visitors.*` + `visitors.legacy_data` | 结构化字段加完整 JSON |
 
 ## 不迁移内容
 

@@ -68,33 +68,33 @@ function saveRoom(room: Room): void {
 }
 
 export const roomRepo: RoomRepository = {
-  add(room: Omit<Room, "_id">): string {
+  async add(room: Omit<Room, "_id">): Promise<string> {
     const id = createId()
     saveRoom({ ...room, _id: id })
     return id
   },
 
-  get(id: string): Room | undefined {
+  async get(id: string): Promise<Room | undefined> {
     const row = db.prepare("SELECT id, data FROM rooms WHERE id = ?").get(id) as { id: string; data: string } | undefined
     return toRoom(row)
   },
 
-  update(id: string, patch: Partial<Room>): Room | undefined {
-    const current = this.get(id)
+  async update(id: string, patch: Partial<Room>): Promise<Room | undefined> {
+    const current = await this.get(id)
     if (!current) return undefined
     const next = { ...current, ...patch, _id: id }
     saveRoom(next)
     return next
   },
 
-  findPlayingRooms(): Room[] {
+  async findPlayingRooms(): Promise<Room[]> {
     const rows = db
       .prepare("SELECT id, data FROM rooms WHERE state = 'OK' AND play_status = 'PLAYING' ORDER BY create_stamp ASC")
       .all() as { id: string; data: string }[]
     return rows.map(toRoom).filter((room): room is Room => Boolean(room))
   },
 
-  findActiveRooms(): Room[] {
+  async findActiveRooms(): Promise<Room[]> {
     const rows = db
       .prepare("SELECT id, data FROM rooms WHERE state = 'OK' ORDER BY create_stamp ASC")
       .all() as { id: string; data: string }[]
@@ -116,20 +116,20 @@ function saveVisitor(visitor: Visitor): void {
 }
 
 export const visitorRepo: VisitorRepository = {
-  getByNonce(nonce: string): Visitor | undefined {
+  async getByNonce(nonce: string): Promise<Visitor | undefined> {
     const row = db.prepare("SELECT id, data FROM visitors WHERE nonce = ?").get(nonce) as { id: string; data: string } | undefined
     if (!row) return undefined
     const visitor = JSON.parse(row.data) as Visitor
     return { ...visitor, _id: row.id }
   },
 
-  add(visitor: Omit<Visitor, "_id">): string {
+  async add(visitor: Omit<Visitor, "_id">): Promise<string> {
     const id = createId()
     saveVisitor({ ...visitor, _id: id })
     return id
   },
 
-  update(id: string, visitor: Visitor): void {
+  async update(id: string, visitor: Visitor): Promise<void> {
     saveVisitor({ ...visitor, _id: id })
   }
 }

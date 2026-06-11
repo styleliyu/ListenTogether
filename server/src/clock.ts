@@ -19,7 +19,7 @@ export function startRoomClock(intervalMs: number): NodeJS.Timeout {
 }
 
 async function handleRoomClock(): Promise<void> {
-  const rooms = roomRepo.findActiveRooms()
+  const rooms = await roomRepo.findActiveRooms()
   if (rooms.length < 1) return
 
   const now = Date.now()
@@ -28,7 +28,7 @@ async function handleRoomClock(): Promise<void> {
     let lastHeartbeat = room.createStamp
 
     if (participants.length < 1) {
-      handleEmptyRoom(room, now)
+      await handleEmptyRoom(room, now)
       continue
     }
 
@@ -50,7 +50,7 @@ async function handleRoomClock(): Promise<void> {
       }
     }
 
-    const next = roomRepo.update(room._id, patch)
+    const next = await roomRepo.update(room._id, patch)
     if (owner !== room.owner && next) {
       const config = normalizeRoomConfig(next.config)
       broadcaster.broadcastRoomInfo(room._id, {
@@ -64,7 +64,7 @@ async function handleRoomClock(): Promise<void> {
   }
 }
 
-function handleEmptyRoom(room: Room, now: number): void {
+async function handleEmptyRoom(room: Room, now: number): Promise<void> {
   const emptyStamp = room.emptyStamp || now
   const patch: Partial<Room> = {}
 
@@ -78,7 +78,7 @@ function handleEmptyRoom(room: Room, now: number): void {
   }
 
   if (Object.keys(patch).length > 0) {
-    roomRepo.update(room._id, patch)
+    await roomRepo.update(room._id, patch)
     if (patch.oState === "DELETED") clearRoomChatHistory(room._id)
   }
 }
