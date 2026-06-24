@@ -344,13 +344,22 @@ async function handleQueueSkipCurrent(socket: PtWebSocket, req: ReqQueueSkipCurr
     return
   }
 
+  const skippedTitle = getCurrentQueueItemTitle(queue)
   const nextIndex = getSkipQueueIndex(queue)
   if (nextIndex < 0) {
-    await pauseQueueAtEnd(req.roomId, { ...room, queue }, req)
+    await pauseQueueAtEnd(req.roomId, { ...room, queue }, req, "已跳过当前歌曲，队列暂无可播放歌曲")
     return
   }
 
-  await switchQueueIndex(req.roomId, { ...room, queue }, nextIndex, req["x-pt-stamp"], req["x-pt-local-id"], room.playStatus)
+  await switchQueueIndex(
+    req.roomId,
+    { ...room, queue },
+    nextIndex,
+    req["x-pt-stamp"],
+    req["x-pt-local-id"],
+    room.playStatus,
+    `已跳过当前歌曲：${skippedTitle}`,
+  )
 }
 
 async function handleQueuePlayNext(socket: PtWebSocket, req: ReqQueuePlayNext): Promise<void> {
@@ -408,7 +417,7 @@ async function handleChatSend(socket: PtWebSocket, req: ReqChatSend): Promise<vo
   })
 }
 
-async function pauseQueueAtEnd(roomId: string, room: Room, req: ReqAdvanceQueue | ReqQueueSkipCurrent): Promise<void> {
+async function pauseQueueAtEnd(roomId: string, room: Room, req: ReqAdvanceQueue | ReqQueueSkipCurrent, noticeContent = "队列播放结束"): Promise<void> {
   const guestId = getOperatorGuestId(req["x-pt-local-id"], room)
   if (!guestId) return
   await roomRepo.update(roomId, {
@@ -430,7 +439,7 @@ async function pauseQueueAtEnd(roomId: string, room: Room, req: ReqAdvanceQueue 
     currentItemId: room.queue?.currentItemId,
     playMode: room.queue?.playMode
   })
-  broadcastRoomNotice(roomId, "playback", "队列播放结束")
+  broadcastRoomNotice(roomId, "playback", noticeContent)
 }
 
 async function switchQueueIndex(
@@ -439,7 +448,8 @@ async function switchQueueIndex(
   index: number,
   stamp: number,
   clientId: string,
-  nextPlayStatus: "PLAYING" | "PAUSED"
+  nextPlayStatus: "PLAYING" | "PAUSED",
+  noticeContent?: string
 ): Promise<void> {
   const baseQueue = normalizeQueue(room.queue)
   if (!baseQueue || index < 0 || index >= baseQueue.items.length) return
@@ -484,7 +494,14 @@ async function switchQueueIndex(
     currentItemId: queue.currentItemId,
     playMode: queue.playMode
   })
-  broadcastRoomNotice(roomId, "playback", `切换歌曲：${targetItem.title || "未知歌曲"}`)
+  broadcastRoomNotice(roomId, "playback", noticeContent || `切换歌曲：${targetItem.title || "未知歌曲"}`)
+}
+
+function getCurrentQueueItemTitle(queue: RoomQueue): string {
+  const currentItem = queue.currentItemId
+    ? queue.items.find(item => item.id === queue.currentItemId)
+    : queue.items[queue.currentIndex]
+  return currentItem?.title || "未知歌曲"
 }
 
 function canLazyResolveQueueItem(roomId: string, item: QueueItem): boolean {
