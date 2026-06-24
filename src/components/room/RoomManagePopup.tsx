@@ -52,7 +52,11 @@ export default function RoomManagePopup({
         </div>
 
         {amIOwner && (
-          <>
+          <section className="rmp-section">
+            <div className="rmp-section__head">
+              <h3>成员权限</h3>
+              <p>这些设置会影响普通成员在房间内可执行的操作。</p>
+            </div>
             <PermissionRow
               label="允许普通成员控制播放"
               checked={permissions.memberCanControlPlayback}
@@ -68,22 +72,28 @@ export default function RoomManagePopup({
               checked={permissions.memberCanImportPlaylist}
               onChange={checked => onPermissionChange("memberCanImportPlaylist", checked)}
             />
-          </>
+          </section>
         )}
 
         {isPersistent && (
-          <div className="rmp-room-name">
-            <div className="rmpb-hd"><span>常驻房间名称</span></div>
+          <section className="rmp-section rmp-room-name">
+            <div className="rmp-section__head">
+              <h3>常驻房间名称</h3>
+              <p>名称会显示在房间页和分享入口。</p>
+            </div>
             <div className="rmp-room-name__body">
               <input value={roomNameDraft} maxLength={30} placeholder="输入房间名称" onChange={event => setRoomNameDraft(event.target.value)} />
               {amIOwner && <button type="button" onClick={() => onRoomNameChange(roomNameDraft)}>保存</button>}
             </div>
-          </div>
+          </section>
         )}
 
         {amIOwner && transferCandidates.length > 0 && (
-          <div className="rmp-transfer">
-            <div className="rmpb-hd"><span>转让房主</span></div>
+          <section className="rmp-section rmp-transfer">
+            <div className="rmp-section__head">
+              <h3>转让房主</h3>
+              <p>转让后，对方将拥有房间管理权限。</p>
+            </div>
             <div className="rmp-transfer__body">
               <select value={transferGuestId} onChange={event => setTransferGuestId(event.target.value)}>
                 <option value="">选择成员</option>
@@ -91,13 +101,17 @@ export default function RoomManagePopup({
               </select>
               <button type="button" disabled={!transferGuestId} onClick={() => onTransferOwner(transferGuestId)}>转让</button>
             </div>
-          </div>
+          </section>
         )}
 
         {isPersistent && amIOwner && (
-          <div className="rmp-danger">
+          <section className="rmp-section rmp-danger">
+            <div className="rmp-section__head">
+              <h3>危险操作</h3>
+              <p>删除后，常驻房间入口将失效。</p>
+            </div>
             <button type="button" onClick={onDeleteRoom}>删除常驻房间</button>
-          </div>
+          </section>
         )}
 
         <div className="rmp-btn">

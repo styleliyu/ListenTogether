@@ -39,17 +39,29 @@ export default function PlaylistImportPanel({
   const failedTracks = progress?.failedTracks || []
   const visibleFailedTracks = failedTracks.slice(0, 10)
   const hiddenCount = Math.max((progress?.failedCount || failedTracks.length) - visibleFailedTracks.length, 0)
+  const total = progress?.total || 0
+  const parsedCount = progress?.parsedCount || 0
+  const progressPercent = total > 0 ? Math.min(100, Math.round((parsedCount / total) * 100)) : 0
+  const statusClass = progress?.status || "message"
 
   return (
-    <div className="playlist-import-panel">
+    <div className={`playlist-import-panel playlist-import-panel_${statusClass}`}>
       <div className="playlist-import-panel__head">
+        <div className="playlist-import-panel__summary">
+          <div className="playlist-import-panel__title">
+            <h3>歌单导入</h3>
+            <span>{statusText}</span>
+          </div>
+          <p>{summary}</p>
+          <div className="playlist-import-panel__stats" aria-label="导入统计">
+            <span>成功 {progress?.addedCount || 0}</span>
+            <span>失败 {progress?.failedCount || 0}</span>
+            <span>总数 {total}</span>
+          </div>
+        </div>
         <button className="playlist-import-panel__toggle" type="button" onClick={onTogglePanel}>
           {pageData.playlistImportCollapsed ? "展开" : "收起"}
         </button>
-        <div className="playlist-import-panel__summary">
-          <h3>歌单导入</h3>
-          <p>{summary}</p>
-        </div>
         {canCancel && (
           <button
             className="playlist-import-panel__cancel"
@@ -64,6 +76,9 @@ export default function PlaylistImportPanel({
 
       {!pageData.playlistImportCollapsed && (
         <>
+          <div className="playlist-import-panel__progress" aria-label={`导入进度 ${progressPercent}%`}>
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
           <div className="playlist-import-panel__grid">
             <span>状态：{statusText}</span>
             <span>已加入：{progress?.addedCount || 0} 首</span>

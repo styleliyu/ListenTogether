@@ -79,70 +79,91 @@ export default function RoomPage() {
         )}
 
         <div className="page-container room-container" style={{ display: pageData.state === 3 ? undefined : "none" }}>
-          <RoomHeader title={roomDisplayName} />
-          <PlayerPanel playerRef={playerEl} />
-
-          <QueueList
-            pageData={pageData}
-            showFailureDetails={showFailureDetails}
-            canControlPlayback={canControlPlayback}
-            canManageQueue={canManageQueue}
-            canAppendQueueByLink={canAppendQueueByLink}
-            onAppendQueueByLink={onAppendQueueByLink}
-            onQueueAdvance={onQueueAdvance}
-            onPlayModeChange={onPlayModeChange}
-            onQueueItemTap={onQueueItemTap}
-            onQueueRemoveItem={onQueueRemoveItem}
-            onQueueSkipCurrent={onQueueSkipCurrent}
-            onQueuePlayNext={onQueuePlayNext}
-            onCancelPlaylistImport={onCancelPlaylistImport}
-            onTogglePlaylistImportPanel={onTogglePlaylistImportPanel}
-            onToggleFailureDetails={() => setShowFailureDetails(value => !value)}
-          />
-
-          <ChatPanel
-            messages={pageData.chatMessages}
-            roomNotices={pageData.roomNotices}
-            participants={pageData.participants}
-            chatError={pageData.chatError}
-            onSendMessage={onSendChatMessage}
-            onClearError={onClearChatError}
-          />
-
-          <div className="room-virtual-one" />
-
-          <RoomMembersPanel
-            participants={pageData.participants}
+          <RoomHeader
+            title={roomDisplayName}
+            roomRole={pageData.roomRole}
+            isPersistent={Boolean(pageData.isPersistent)}
+            participantCount={pageData.participants.length}
             onManage={() => setShowManagePopup(true)}
-            onEditMyName={onEditMyName}
+            onShare={() => setShowSharePopup(true)}
+            onLeave={() => { if (window.confirm("确定要离开吗？")) toHome() }}
           />
 
-          <div className="room-btns">
-            <button className="room-btn" type="button" onClick={() => { if (window.confirm("确定要离开吗？")) toHome() }}>
-              <span>离开</span>
-            </button>
-            <button className="room-btn room-btn-main" type="button" onClick={() => setShowSharePopup(true)}>
-              <span>分享</span>
-            </button>
-          </div>
+          <div className="room-shell">
+            <main className="room-main">
+              <PlayerPanel playerRef={playerEl} />
 
-          {pageData.content?.title && pageData.content?.description && (
-            <div className="room-title-desc">
-              <div className="room-podcast-title"><span>{pageData.content.title}</span></div>
-              <div className="room-desc-box">
-                <div className={`room-description ${pageData.showMoreBox ? "room-desc-limited" : ""} ${hasLink ? "room-desc_pointer" : ""}`} onClick={!pageData.showMoreBox ? onTapShowMore : undefined}>
-                  <span>{pageData.content.description}</span>
+              <QueueList
+                pageData={pageData}
+                showFailureDetails={showFailureDetails}
+                canControlPlayback={canControlPlayback}
+                canManageQueue={canManageQueue}
+                canAppendQueueByLink={canAppendQueueByLink}
+                onAppendQueueByLink={onAppendQueueByLink}
+                onQueueAdvance={onQueueAdvance}
+                onPlayModeChange={onPlayModeChange}
+                onQueueItemTap={onQueueItemTap}
+                onQueueRemoveItem={onQueueRemoveItem}
+                onQueueSkipCurrent={onQueueSkipCurrent}
+                onQueuePlayNext={onQueuePlayNext}
+                onCancelPlaylistImport={onCancelPlaylistImport}
+                onTogglePlaylistImportPanel={onTogglePlaylistImportPanel}
+                onToggleFailureDetails={() => setShowFailureDetails(value => !value)}
+              />
+
+              {pageData.content?.title && pageData.content?.description && (
+                <section className="room-title-desc">
+                  <div className="room-section-head">
+                    <div>
+                      <h2>{pageData.content.title}</h2>
+                      <p>当前内容简介</p>
+                    </div>
+                  </div>
+                  <div className="room-desc-box">
+                    <div className={`room-description ${pageData.showMoreBox ? "room-desc-limited" : ""} ${hasLink ? "room-desc_pointer" : ""}`} onClick={!pageData.showMoreBox ? onTapShowMore : undefined}>
+                      <span>{pageData.content.description}</span>
+                    </div>
+                    {pageData.showMoreBox && (
+                      <button className="room-show-more" type="button" onClick={onTapShowMore}>
+                        <span className="room-show-more-text">{hasLink ? "查看原文" : "展开更多"}</span>
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
+            </main>
+
+            <aside className="room-sidebar">
+              <ChatPanel
+                messages={pageData.chatMessages}
+                roomNotices={pageData.roomNotices}
+                participants={pageData.participants}
+                chatError={pageData.chatError}
+                onSendMessage={onSendChatMessage}
+                onClearError={onClearChatError}
+              />
+
+              <RoomMembersPanel
+                participants={pageData.participants}
+                ownerGuestId={pageData.ownerGuestId}
+                onManage={() => setShowManagePopup(true)}
+                onEditMyName={onEditMyName}
+              />
+
+              <section className="room-side-actions" aria-label="房间快捷操作">
+                <div className="room-section-head">
+                  <div>
+                    <h2>房间操作</h2>
+                    <p>分享邀请或调整房间设置</p>
+                  </div>
                 </div>
-                {pageData.showMoreBox && (
-                  <button className="room-show-more" type="button" onClick={onTapShowMore}>
-                    <span className="room-show-more-text">{hasLink ? "查看原文" : "展开更多"}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="room-virtual-two" />
+                <div className="room-side-actions__grid">
+                  <button className="room-ui-btn room-ui-btn_secondary" type="button" onClick={() => setShowManagePopup(true)}>管理</button>
+                  <button className="room-ui-btn room-ui-btn_primary" type="button" onClick={() => setShowSharePopup(true)}>分享</button>
+                </div>
+              </section>
+            </aside>
+          </div>
         </div>
 
         {pageData.state >= 11 && (

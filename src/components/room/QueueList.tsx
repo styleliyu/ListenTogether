@@ -72,13 +72,12 @@ export default function QueueList({
   }, [])
 
   if (!queue || queueItems.length < 1) {
-    if (!hasImportPanel) return null
     return (
-      <div className="room-queue">
+      <section className="room-queue" aria-label="播放队列">
         <div className="queue-head">
           <div>
             <h2>播放队列</h2>
-            <p>暂无歌曲</p>
+            <p>暂无歌曲 · 可以添加歌曲或导入歌单</p>
           </div>
           <div className="queue-actions">
             <button type="button" disabled={!canAppendQueueByLink} onClick={onAppendQueueByLink}>添加歌曲/歌单</button>
@@ -91,12 +90,16 @@ export default function QueueList({
           onCancel={onCancelPlaylistImport}
           onToggleFailureDetails={onToggleFailureDetails}
         />
-      </div>
+        <div className="queue-empty">
+          <span>队列为空</span>
+          <p>添加后，歌曲会出现在这里并同步给房间成员。</p>
+        </div>
+      </section>
     )
   }
 
   return (
-    <div className="room-queue">
+    <section className="room-queue" aria-label="播放队列">
       <div className="queue-head">
         <div>
           <h2>播放队列</h2>
@@ -121,12 +124,14 @@ export default function QueueList({
       <div className="queue-list">
         {visibleItems.map((item, index) => {
           const current = isCurrent(index, item.id)
+          const next = !current && index === (queue.currentIndex || 0) + 1
           return (
             <QueueItemRow
               key={item.id}
               item={item}
               index={index}
               current={current}
+              next={next}
               canControlPlayback={canControlPlayback}
               canManageQueue={canManageQueue}
               onQueueItemTap={onQueueItemTap}
@@ -147,7 +152,7 @@ export default function QueueList({
           </div>
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -155,6 +160,7 @@ interface QueueItemRowProps {
   item: QueueItem
   index: number
   current: boolean
+  next: boolean
   canControlPlayback: boolean
   canManageQueue: boolean
   onQueueItemTap: (index: number) => void
@@ -167,6 +173,7 @@ const QueueItemRow = memo(function QueueItemRow({
   item,
   index,
   current,
+  next,
   canControlPlayback,
   canManageQueue,
   onQueueItemTap,
@@ -182,11 +189,15 @@ const QueueItemRow = memo(function QueueItemRow({
     <div className={`queue-item ${current ? "queue-item_active" : ""}`}>
       <button className="queue-item__main" type="button" disabled={!canControlPlayback} onClick={tapItem}>
         <span className="queue-index">{index + 1}</span>
-        <span className="queue-title">{item.title}</span>
-        <span className="queue-artist">{item.artist}</span>
+        <span className="queue-item__copy">
+          <span className="queue-title">{item.title}</span>
+          <span className="queue-artist">{item.artist || "未知艺术家"}</span>
+        </span>
+        <span className="queue-item__status">
+          {current ? "当前播放" : next ? "下一首" : ""}
+        </span>
       </button>
       <div className="queue-item__actions">
-        {current && <span className="queue-item__badge">当前播放</span>}
         {current ? (
           <button className="queue-item__mini" type="button" disabled={!canManageQueue} onClick={onQueueSkipCurrent}>跳过</button>
         ) : (

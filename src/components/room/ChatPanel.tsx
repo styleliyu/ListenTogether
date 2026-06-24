@@ -109,8 +109,8 @@ const ChatPanel = memo(function ChatPanel({
       <form className="room-chat__form" onSubmit={onSubmit}>
         <textarea
           value={draft}
-          rows={3}
-          placeholder="输入消息"
+          rows={2}
+          placeholder="输入消息，Enter 发送"
           onChange={(event) => {
             setDraft(event.target.value)
             setLocalError("")
