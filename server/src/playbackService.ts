@@ -1,5 +1,6 @@
 import type { ReqOperatePlayer, Room, RoomConfig, RoomStatus } from "./types"
 import { canControlPlayback, normalizeRoomConfig } from "./permissionService"
+import { toPlaybackMs, toTimestampMs } from "./repositories/normalizeRoomForStorage"
 
 export const MIN_DURATION_FOR_A_PERSON = 250
 
@@ -24,11 +25,13 @@ export function buildPlaybackUpdate(input: {
   const { room, roomId, req, guestId, isOwner, defaultRoomCfg } = input
   const roomCfg = normalizeRoomConfig(room.config || defaultRoomCfg)
   const newRoomCfg = { ...roomCfg }
+  const contentStamp = toPlaybackMs(req.contentStamp)
+  const operateStamp = toTimestampMs(req["x-pt-stamp"])
   const patch: Partial<Room> = {
     playStatus: req.playStatus,
     speedRate: req.speedRate,
-    contentStamp: req.contentStamp,
-    operateStamp: req["x-pt-stamp"],
+    contentStamp,
+    operateStamp,
     operator: guestId
   }
 
@@ -36,8 +39,8 @@ export function buildPlaybackUpdate(input: {
     roomId,
     playStatus: req.playStatus,
     speedRate: req.speedRate,
-    contentStamp: req.contentStamp,
-    operateStamp: req["x-pt-stamp"],
+    contentStamp,
+    operateStamp,
     operator: guestId
   }
 

@@ -2,6 +2,7 @@ import crypto from "crypto"
 import type { PoolClient, QueryResultRow } from "pg"
 import type { Room, RoomQueue } from "../../types"
 import type { RoomRepository } from "../../repositories/types"
+import { normalizeRoomForStorage } from "../../repositories/normalizeRoomForStorage"
 import { getPgPool } from "./pool"
 
 function createId(): string {
@@ -29,6 +30,7 @@ function parseJson(value: unknown): unknown {
 }
 
 async function saveRoom(room: Room): Promise<void> {
+  const normalizedRoom = normalizeRoomForStorage(room)
   const pool = getPgPool()
   const client = await pool.connect()
   try {
@@ -65,29 +67,29 @@ async function saveRoom(room: Room): Promise<void> {
           legacy_data = excluded.legacy_data
       `,
       [
-        room._id,
-        room.owner,
-        room.oState,
-        room.roomName || null,
-        Boolean(room.isPersistent),
-        room.playStatus,
-        room.speedRate,
-        room.contentStamp,
-        room.operateStamp,
-        room.operator || null,
-        room.queue?.currentIndex ?? null,
-        room.queue?.currentItemId ?? null,
-        room.queue?.playMode ?? null,
-        room.emptyStamp ?? null,
-        room.createStamp,
+        normalizedRoom._id,
+        normalizedRoom.owner,
+        normalizedRoom.oState,
+        normalizedRoom.roomName || null,
+        Boolean(normalizedRoom.isPersistent),
+        normalizedRoom.playStatus,
+        normalizedRoom.speedRate,
+        normalizedRoom.contentStamp,
+        normalizedRoom.operateStamp,
+        normalizedRoom.operator || null,
+        normalizedRoom.queue?.currentIndex ?? null,
+        normalizedRoom.queue?.currentItemId ?? null,
+        normalizedRoom.queue?.playMode ?? null,
+        normalizedRoom.emptyStamp ?? null,
+        normalizedRoom.createStamp,
         Date.now(),
-        JSON.stringify(room.content || {}),
-        JSON.stringify(room.config?.permissions || {}),
-        JSON.stringify(room)
+        JSON.stringify(normalizedRoom.content || {}),
+        JSON.stringify(normalizedRoom.config?.permissions || {}),
+        JSON.stringify(normalizedRoom)
       ]
     )
-    await syncMembers(client, room)
-    await syncQueueItems(client, room._id, room.queue)
+    await syncMembers(client, normalizedRoom)
+    await syncQueueItems(client, normalizedRoom._id, normalizedRoom.queue)
     await client.query("COMMIT")
   } catch (err) {
     await client.query("ROLLBACK")
@@ -168,8 +170,9 @@ export const postgresRoomRepo: RoomRepository = {
     const current = await this.get(id)
     if (!current) return undefined
     const next = { ...current, ...patch, _id: id }
-    await saveRoom(next)
-    return next
+    const normalizedNext = normalizeRoomForStorage(next)
+    await saveRoom(normalizedNext)
+    return normalizedNext
   },
 
   async findPlayingRooms(): Promise<Room[]> {

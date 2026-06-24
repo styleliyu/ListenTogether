@@ -5,6 +5,7 @@ import { getOwnerGuestId, normalizeRoomConfig, resolveOwnerAfterParticipants } f
 import { broadcaster } from "./websocket/broadcaster"
 import { clearRoomChatHistory } from "./chatService"
 import { appendRoomNotice, clearRoomNoticeHistory } from "./roomNoticeService"
+import { toPlaybackMs, toTimestampMs } from "./repositories/normalizeRoomForStorage"
 
 export function startRoomClock(intervalMs: number): NodeJS.Timeout {
   const run = async () => {
@@ -99,11 +100,11 @@ async function handleEmptyRoom(room: Room, now: number): Promise<void> {
 function buildPausePatch(room: Room, lastHeartbeat: number, now: number): Partial<Room> {
   let speedRateNum = Number(room.speedRate)
   if (Number.isNaN(speedRateNum) || speedRateNum >= 1.71) speedRateNum = 1
-  const diffMilli = Math.max(0, lastHeartbeat - room.operateStamp)
+  const diffMilli = Math.max(0, toTimestampMs(lastHeartbeat) - toTimestampMs(room.operateStamp))
   return {
     playStatus: "PAUSED",
-    contentStamp: room.contentStamp + diffMilli * speedRateNum,
-    operateStamp: now,
+    contentStamp: toPlaybackMs(room.contentStamp + diffMilli * speedRateNum),
+    operateStamp: toTimestampMs(now),
     operator: ""
   }
 }

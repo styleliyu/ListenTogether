@@ -5,6 +5,7 @@ import Database from "better-sqlite3"
 import type { Room, Visitor } from "./types"
 import { env } from "./config/env"
 import type { RoomRepository, VisitorRepository } from "./repositories/types"
+import { normalizeRoomForStorage } from "./repositories/normalizeRoomForStorage"
 
 const DEFAULT_DB_PATH = path.resolve(process.cwd(), "data", "podcast-together.db")
 const dbPath = path.resolve(env.databasePath || DEFAULT_DB_PATH)
@@ -47,7 +48,8 @@ function toRoom(row?: { id: string; data: string }): Room | undefined {
 }
 
 function saveRoom(room: Room): void {
-  const data = JSON.stringify(room)
+  const normalizedRoom = normalizeRoomForStorage(room)
+  const data = JSON.stringify(normalizedRoom)
   db.prepare(`
     INSERT INTO rooms (id, owner, state, play_status, create_stamp, data)
     VALUES (@id, @owner, @state, @playStatus, @createStamp, @data)
@@ -58,11 +60,11 @@ function saveRoom(room: Room): void {
       create_stamp = excluded.create_stamp,
       data = excluded.data
   `).run({
-    id: room._id,
-    owner: room.owner,
-    state: room.oState,
-    playStatus: room.playStatus,
-    createStamp: room.createStamp,
+    id: normalizedRoom._id,
+    owner: normalizedRoom.owner,
+    state: normalizedRoom.oState,
+    playStatus: normalizedRoom.playStatus,
+    createStamp: normalizedRoom.createStamp,
     data
   })
 }
@@ -83,8 +85,9 @@ export const roomRepo: RoomRepository = {
     const current = await this.get(id)
     if (!current) return undefined
     const next = { ...current, ...patch, _id: id }
-    saveRoom(next)
-    return next
+    const normalizedNext = normalizeRoomForStorage(next)
+    saveRoom(normalizedNext)
+    return normalizedNext
   },
 
   async findPlayingRooms(): Promise<Room[]> {

@@ -17,6 +17,7 @@ import { broadcaster } from "./websocket/broadcaster"
 import { normalizeQueue } from "./queueService"
 import { clearRoomChatHistory } from "./chatService"
 import { appendRoomNotice, clearRoomNoticeHistory } from "./roomNoticeService"
+import { toPlaybackMs, toTimestampMs } from "./repositories/normalizeRoomForStorage"
 import {
   DEFAULT_ROOM_CONFIG,
   assertRoomPermission,
@@ -362,9 +363,9 @@ export function pausePlayer(room: Room, operator = ""): Room {
     for (const person of next.participants) {
       if (person.heartbeatStamp > lastHeartbeat) lastHeartbeat = person.heartbeatStamp
     }
-    const diffStamp = lastHeartbeat - next.operateStamp
-    next.contentStamp = next.contentStamp + diffStamp * speedRateNum
-    next.operateStamp = Date.now()
+    const diffStamp = toTimestampMs(lastHeartbeat) - toTimestampMs(next.operateStamp)
+    next.contentStamp = toPlaybackMs(next.contentStamp + diffStamp * speedRateNum)
+    next.operateStamp = toTimestampMs(Date.now())
     next.operator = operator
   }
 
