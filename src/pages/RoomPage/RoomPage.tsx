@@ -149,19 +149,6 @@ export default function RoomPage() {
                 onManage={() => setShowManagePopup(true)}
                 onEditMyName={onEditMyName}
               />
-
-              <section className="room-side-actions" aria-label="房间快捷操作">
-                <div className="room-section-head">
-                  <div>
-                    <h2>房间操作</h2>
-                    <p>分享邀请或调整房间设置</p>
-                  </div>
-                </div>
-                <div className="room-side-actions__grid">
-                  <button className="room-ui-btn room-ui-btn_secondary" type="button" onClick={() => setShowManagePopup(true)}>管理</button>
-                  <button className="room-ui-btn room-ui-btn_primary" type="button" onClick={() => setShowSharePopup(true)}>分享</button>
-                </div>
-              </section>
             </aside>
           </div>
         </div>
