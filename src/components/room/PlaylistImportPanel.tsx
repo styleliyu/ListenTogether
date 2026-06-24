@@ -43,6 +43,24 @@ export default function PlaylistImportPanel({
   const parsedCount = progress?.parsedCount || 0
   const progressPercent = total > 0 ? Math.min(100, Math.round((parsedCount / total) * 100)) : 0
   const statusClass = progress?.status || "message"
+  const compactSummary = `成功 ${progress?.addedCount || 0} / 失败 ${progress?.failedCount || 0} / 总数 ${total}`
+
+  if (pageData.playlistImportCollapsed) {
+    return (
+      <div className={`playlist-import-panel playlist-import-panel_collapsed playlist-import-panel_${statusClass}`}>
+        <div className="playlist-import-panel__compact">
+          <div className="playlist-import-panel__compact-main">
+            <strong>歌单导入</strong>
+            <span>{statusText}</span>
+            <span>{compactSummary}</span>
+          </div>
+          <button className="playlist-import-panel__toggle" type="button" onClick={onTogglePanel}>
+            展开
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`playlist-import-panel playlist-import-panel_${statusClass}`}>
@@ -60,7 +78,7 @@ export default function PlaylistImportPanel({
           </div>
         </div>
         <button className="playlist-import-panel__toggle" type="button" onClick={onTogglePanel}>
-          {pageData.playlistImportCollapsed ? "展开" : "收起"}
+          收起
         </button>
         {canCancel && (
           <button

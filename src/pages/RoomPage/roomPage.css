@@ -286,10 +286,10 @@
 }
 
 .rp-player .shk-player {
-  min-height: 230px;
+  min-height: 260px;
   height: auto;
   border-radius: 18px;
-  padding: 22px;
+  padding: 22px 22px 54px;
   box-sizing: border-box;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, .08), transparent 38%),
@@ -333,20 +333,21 @@
 .rp-player .shk-bar_wrap {
   position: absolute;
   left: 22px;
-  right: auto;
-  top: 202px !important;
-  bottom: auto;
-  width: 172px;
+  right: 22px;
+  top: auto !important;
+  bottom: 30px;
+  width: auto;
   height: 18px;
   padding: 8px 0;
   cursor: pointer;
 }
 
 .rp-player .shk-display {
-  top: 224px !important;
+  top: auto !important;
+  bottom: 10px;
   left: 22px;
-  right: auto;
-  width: 172px;
+  right: 22px;
+  width: auto;
   color: var(--muted-text, var(--note-color));
 }
 
@@ -420,6 +421,39 @@
   border: 1px solid var(--panel-border, transparent);
   border-radius: 12px;
   background: var(--panel-sub-bg, var(--card-color));
+}
+
+.playlist-import-panel_collapsed {
+  padding: 10px 12px;
+}
+
+.playlist-import-panel__compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.playlist-import-panel__compact-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-text, var(--note-color));
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.playlist-import-panel__compact-main strong {
+  flex: 0 0 auto;
+  color: var(--primary-text, var(--text-color));
+  font-size: 14px;
+}
+
+.playlist-import-panel__compact-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .playlist-import-panel_failed {
@@ -1296,7 +1330,7 @@
 
   .rp-player .shk-player {
     min-height: 388px;
-    padding: 16px;
+    padding: 16px 16px 56px;
   }
 
   .rp-player .shk-body {
@@ -1309,7 +1343,7 @@
     width: min(190px, 62vw);
     height: min(190px, 62vw);
     flex-basis: auto;
-    margin: 0 auto 56px;
+    margin: 0 auto 18px;
   }
 
   .rp-player .shk-main {
@@ -1320,7 +1354,8 @@
   .rp-player .shk-bar_wrap {
     left: 16px;
     right: 16px;
-    top: calc(16px + min(190px, 62vw) + 12px) !important;
+    top: auto !important;
+    bottom: 30px;
     width: auto;
     margin: 0;
   }
@@ -1328,8 +1363,17 @@
   .rp-player .shk-display {
     left: 16px;
     right: 16px;
-    top: calc(16px + min(190px, 62vw) + 36px) !important;
+    top: auto !important;
+    bottom: 10px;
     width: auto;
+  }
+
+  .playlist-import-panel__compact {
+    align-items: flex-start;
+  }
+
+  .playlist-import-panel__compact-main {
+    flex-wrap: wrap;
   }
 
   .queue-item {
