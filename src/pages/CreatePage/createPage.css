@@ -1,9 +1,11 @@
 .create-page {
-  --create-border: #c7c0b6;
+  --create-border: #8b8177;
   --create-field-bg: #fbfaf8;
   --create-soft-accent: rgba(211, 155, 69, .14);
+  --create-accent-text: #865a16;
+  --create-focus: #865a16;
   --create-shadow: 0 18px 48px rgba(62, 48, 32, .08);
-  min-height: calc(100dvh - 92px);
+  min-height: 100dvh;
   box-sizing: border-box;
   padding: 0 24px;
   overflow-x: hidden;
@@ -11,9 +13,11 @@
 }
 
 .dark-theme .create-page {
-  --create-border: #5c554d;
+  --create-border: #8f877f;
   --create-field-bg: #25231f;
   --create-soft-accent: rgba(241, 198, 128, .14);
+  --create-accent-text: #f1c680;
+  --create-focus: #f1c680;
   --create-shadow: 0 18px 48px rgba(0, 0, 0, .22);
 }
 
@@ -66,7 +70,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--accent-color, var(--theme-a));
+  color: var(--create-accent-text);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: .06em;
@@ -232,8 +236,8 @@
 
 .create-input:focus,
 .create-input:focus-visible {
-  border-color: var(--accent-color, var(--theme-a));
-  box-shadow: 0 0 0 3px var(--create-soft-accent);
+  border-color: var(--create-focus);
+  box-shadow: 0 0 0 3px var(--create-focus);
 }
 
 .create-input:disabled {
@@ -322,7 +326,7 @@
 }
 
 .settings-panel {
-  min-height: 100%;
+  min-height: 0;
 }
 
 .persistent-card {
@@ -403,7 +407,7 @@
 }
 
 .persistent-toggle > input:focus-visible + .toggle-track {
-  outline: 3px solid var(--create-soft-accent);
+  outline: 3px solid var(--create-focus);
   outline-offset: 3px;
 }
 
@@ -547,7 +551,7 @@
 .create-back:focus-visible,
 .create-page .pt-button:focus-visible,
 .feedback-dismiss:focus-visible {
-  outline: 3px solid var(--create-soft-accent);
+  outline: 3px solid var(--create-focus);
   outline-offset: 3px;
 }
 
@@ -615,7 +619,7 @@
 
 @media screen and (max-width: 600px) {
   .create-page {
-    min-height: calc(100dvh - 64px);
+    min-height: 100dvh;
     padding: 0 20px;
   }
 

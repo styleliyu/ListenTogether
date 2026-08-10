@@ -62,11 +62,9 @@ export default function IndexPage() {
   }, [showGithubMenu])
 
   useEffect(() => {
-    if (!showTutorial) {
-      document.body.style.overflow = ""
-      return
-    }
+    if (!showTutorial) return
 
+    const previousBodyOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     tutorialCloseRef.current?.focus()
 
@@ -99,7 +97,7 @@ export default function IndexPage() {
     document.addEventListener("keydown", handleKeyDown)
     return () => {
       document.removeEventListener("keydown", handleKeyDown)
-      document.body.style.overflow = ""
+      document.body.style.overflow = previousBodyOverflow
     }
   }, [showTutorial])
 

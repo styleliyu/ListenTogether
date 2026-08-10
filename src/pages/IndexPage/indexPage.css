@@ -6,6 +6,7 @@
   --index-secondary: var(--secondary-text, var(--desc-color));
   --index-muted: var(--secondary-text, var(--desc-color));
   --index-accent: var(--accent-color, var(--theme-a));
+  --index-text-accent: #865a16;
   --index-border: rgba(36, 32, 26, .14);
   --index-soft-border: rgba(36, 32, 26, .08);
   min-height: 100vh;
@@ -16,6 +17,7 @@
   color: var(--index-ink);
 }
 .dark-theme .index-page {
+  --index-text-accent: var(--index-accent);
   --index-border: rgba(255, 255, 255, .18);
   --index-soft-border: rgba(255, 255, 255, .1);
   background:
@@ -452,7 +454,7 @@
 .index-capability-number {
   flex: 0 0 auto;
   padding-top: 2px;
-  color: var(--index-accent);
+  color: var(--index-text-accent);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .1em;

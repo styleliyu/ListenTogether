@@ -35,13 +35,13 @@ export default function CreatePage() {
   const busy = status !== "idle"
   const normalizedRoomName = useMemo(() => isPersistent ? roomName.trim().slice(0, 30) : "", [isPersistent, roomName])
   const roomNameHasError = isPersistent && roomName.length > 0 && !roomName.trim()
-  const canSubmit = useMemo(() => {
+  const linkIsValid = useMemo(() => {
     const value = inputValue.trim()
     if (value.length < 10) return false
-    if (isPersistent && roomName.length > 0 && !roomName.trim()) return false
     return /^https?:\/\/[\w.-]*\w{1,32}\.\w{2,6}\S*$/i.test(value)
-  }, [inputValue, isPersistent, roomName])
-  const linkHasError = linkTouched && inputValue.trim().length > 0 && !canSubmit
+  }, [inputValue])
+  const canSubmit = linkIsValid && !roomNameHasError
+  const linkHasError = linkTouched && inputValue.trim().length > 0 && !linkIsValid
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
