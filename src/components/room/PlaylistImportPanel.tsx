@@ -47,14 +47,14 @@ export default function PlaylistImportPanel({
 
   if (pageData.playlistImportCollapsed) {
     return (
-      <div className={`playlist-import-panel playlist-import-panel_collapsed playlist-import-panel_${statusClass}`}>
+      <div className={`playlist-import-panel playlist-import-panel_collapsed playlist-import-panel_${statusClass}`} id="playlist-import-details">
         <div className="playlist-import-panel__compact">
           <div className="playlist-import-panel__compact-main">
             <strong>歌单导入</strong>
             <span>{statusText}</span>
             <span>{compactSummary}</span>
           </div>
-          <button className="playlist-import-panel__toggle" type="button" onClick={onTogglePanel}>
+          <button className="playlist-import-panel__toggle" type="button" aria-expanded="false" aria-controls="playlist-import-details" onClick={onTogglePanel}>
             展开
           </button>
         </div>
@@ -63,21 +63,21 @@ export default function PlaylistImportPanel({
   }
 
   return (
-    <div className={`playlist-import-panel playlist-import-panel_${statusClass}`}>
+    <div className={`playlist-import-panel playlist-import-panel_${statusClass}`} id="playlist-import-details">
       <div className="playlist-import-panel__head">
         <div className="playlist-import-panel__summary">
           <div className="playlist-import-panel__title">
             <h3>歌单导入</h3>
             <span>{statusText}</span>
           </div>
-          <p>{summary}</p>
+          <p role="status" aria-live="polite">{summary}</p>
           <div className="playlist-import-panel__stats" aria-label="导入统计">
             <span>成功 {progress?.addedCount || 0}</span>
             <span>失败 {progress?.failedCount || 0}</span>
             <span>总数 {total}</span>
           </div>
         </div>
-        <button className="playlist-import-panel__toggle" type="button" onClick={onTogglePanel}>
+        <button className="playlist-import-panel__toggle" type="button" aria-expanded="true" aria-controls="playlist-import-details" onClick={onTogglePanel}>
           收起
         </button>
         {canCancel && (
@@ -94,7 +94,14 @@ export default function PlaylistImportPanel({
 
       {!pageData.playlistImportCollapsed && (
         <>
-          <div className="playlist-import-panel__progress" aria-label={`导入进度 ${progressPercent}%`}>
+          <div
+            className="playlist-import-panel__progress"
+            role="progressbar"
+            aria-label={`导入进度 ${progressPercent}%`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPercent}
+          >
             <span style={{ width: `${progressPercent}%` }} />
           </div>
           <div className="playlist-import-panel__grid">
@@ -106,11 +113,11 @@ export default function PlaylistImportPanel({
 
           {(progress?.failedCount || 0) > 0 && failedTracks.length > 0 && (
             <div className="playlist-import-panel__failures">
-              <button className="playlist-import-panel__failure-toggle" type="button" onClick={onToggleFailureDetails}>
+              <button className="playlist-import-panel__failure-toggle" type="button" aria-expanded={showFailureDetails} aria-controls="playlist-import-failures" onClick={onToggleFailureDetails}>
                 {showFailureDetails ? "收起失败详情" : "查看失败详情"}
               </button>
               {showFailureDetails && (
-                <div className="playlist-import-panel__failure-list">
+                <div className="playlist-import-panel__failure-list" id="playlist-import-failures">
                   {visibleFailedTracks.map((item, index) => (
                     <div key={`${item.source || item.title || "failed"}-${index}`} className="playlist-import-panel__failure-item">
                       <div className="playlist-import-panel__failure-main">{item.title || item.source || "未知歌曲"}</div>

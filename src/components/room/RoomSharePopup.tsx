@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import PtButton from "../PtButton"
 import { copyShareLink, createRoomQrCode, nativeShareOrCopy } from "../../services/share"
+import useRoomModal from "./useRoomModal"
 
 interface RoomSharePopupProps {
   show: boolean
@@ -21,6 +22,7 @@ export default function RoomSharePopup({
 }: RoomSharePopupProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState("")
   const [qrCodeError, setQrCodeError] = useState("")
+  const { dialogRef, initialFocusRef } = useRoomModal(show, onClose)
   const roomTitle = roomName.trim() || `一起听房间 ${roomId}`
   const roomDesc = isPersistent ? "常驻房间二维码长期有效，删除房间后失效。" : "临时房间二维码在房间未删除前可用。"
   const nativeShareData = useMemo<ShareData>(() => ({
@@ -48,22 +50,35 @@ export default function RoomSharePopup({
     if (!done) window.alert("请手动复制房间链接。")
   }
 
+  if (!show) return null
+
   return (
-    <div className={`rsp-container ${show ? "rsp-container_show" : ""}`} onClick={onClose}>
-      <div className="rsp-box" onClick={event => event.stopPropagation()}>
+    <div className="rsp-container rsp-container_show" onPointerDown={event => {
+      if (event.target === event.currentTarget) onClose()
+    }}>
+      <div
+        className="rsp-box"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="room-share-title"
+        aria-describedby="room-share-description"
+        tabIndex={-1}
+      >
         <div className="rsp-head">
           <div>
-            <h2>分享房间</h2>
-            <p>{roomDesc}</p>
+            <div className="room-panel-kicker"><span aria-hidden="true" /> INVITE LISTENERS</div>
+            <h2 id="room-share-title">分享房间</h2>
+            <p id="room-share-description">{roomDesc}</p>
           </div>
-          <button className="rsp-close" type="button" aria-label="关闭" onClick={onClose}>×</button>
+          <button className="rsp-close room-dialog-close" ref={initialFocusRef} type="button" aria-label="关闭分享房间" onClick={onClose}>×</button>
         </div>
 
-        <div className="rsp-qr">
+        <div className="rsp-qr" aria-live="polite">
           {qrCodeUrl ? <img src={qrCodeUrl} alt="房间二维码" /> : <div className="rsp-qr-placeholder"><span>{qrCodeError || "正在生成二维码..."}</span></div>}
         </div>
 
-        <div className="rsp-link"><span>{shareUrl}</span></div>
+        <div className="rsp-link" aria-label="房间分享链接"><span>{shareUrl}</span></div>
 
         <div className="rsp-actions">
           <PtButton text="复制链接" type="other" onClick={onCopyLink} />
