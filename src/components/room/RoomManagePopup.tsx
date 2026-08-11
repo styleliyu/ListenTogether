@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import PtButton from "../PtButton"
 import type { PageParticipant, RoomPermissionConfig, RoomRole } from "../../types"
+import useRoomModal from "./useRoomModal"
 
 interface RoomManagePopupProps {
   show: boolean
@@ -34,17 +35,35 @@ export default function RoomManagePopup({
   const [roomNameDraft, setRoomNameDraft] = useState(roomName)
   const [transferGuestId, setTransferGuestId] = useState("")
   const transferCandidates = useMemo(() => participants.filter(item => !item.isMe), [participants])
+  const { dialogRef, initialFocusRef } = useRoomModal(show, onClose)
 
   useEffect(() => setRoomNameDraft(roomName), [roomName])
   useEffect(() => {
     if (show) setTransferGuestId("")
   }, [show])
 
+  if (!show) return null
+
   return (
-    <div className={`rmp-container ${show ? "rmp-container_show" : ""}`} onClick={onClose}>
-      <div className="rmp-box" onClick={event => event.stopPropagation()}>
+    <div className="rmp-container rmp-container_show" onPointerDown={event => {
+      if (event.target === event.currentTarget) onClose()
+    }}>
+      <div
+        className="rmp-box"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="room-manage-title"
+        aria-describedby="room-manage-description"
+        tabIndex={-1}
+      >
         <div className="rmp-first-bar">
-          <div className="rmpf-title">管理</div>
+          <div>
+            <div className="room-panel-kicker"><span aria-hidden="true" /> ROOM CONTROL</div>
+            <div className="rmpf-title" id="room-manage-title">房间管理</div>
+            <p id="room-manage-description">在不打断共同收听的前提下，调整成员权限与房间信息。</p>
+          </div>
+          <button className="room-dialog-close" ref={initialFocusRef} type="button" aria-label="关闭房间管理" onClick={onClose}>×</button>
         </div>
         <div className="rmp-role">
           <span>当前身份</span>
@@ -82,9 +101,11 @@ export default function RoomManagePopup({
               <p>名称会显示在房间页和分享入口。</p>
             </div>
             <div className="rmp-room-name__body">
-              <input value={roomNameDraft} maxLength={30} placeholder="输入房间名称" onChange={event => setRoomNameDraft(event.target.value)} />
+              <label className="room-field-label" htmlFor="room-name-draft">房间名称</label>
+              <input id="room-name-draft" value={roomNameDraft} maxLength={30} placeholder="输入房间名称" aria-describedby="room-name-count" onChange={event => setRoomNameDraft(event.target.value)} />
               {amIOwner && <button type="button" onClick={() => onRoomNameChange(roomNameDraft)}>保存</button>}
             </div>
+            <div className="rmp-field-note" id="room-name-count">{roomNameDraft.length}/30</div>
           </section>
         )}
 
@@ -95,7 +116,8 @@ export default function RoomManagePopup({
               <p>转让后，对方将拥有房间管理权限。</p>
             </div>
             <div className="rmp-transfer__body">
-              <select value={transferGuestId} onChange={event => setTransferGuestId(event.target.value)}>
+              <label className="room-field-label" htmlFor="room-owner-transfer">新房主</label>
+              <select id="room-owner-transfer" value={transferGuestId} onChange={event => setTransferGuestId(event.target.value)}>
                 <option value="">选择成员</option>
                 {transferCandidates.map(item => <option key={item.guestId} value={item.guestId}>{item.nickName}</option>)}
               </select>
@@ -127,7 +149,7 @@ function PermissionRow({ label, checked, onChange }: { label: string, checked: b
     <label className="rmp-bar">
       <div className="rmpb-hd"><span>{label}</span></div>
       <div className="rmpb-footer">
-        <input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} />
+        <input type="checkbox" role="switch" checked={checked} onChange={event => onChange(event.target.checked)} />
       </div>
     </label>
   )

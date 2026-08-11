@@ -65,16 +65,26 @@ export default function RoomPage() {
 
   return (
     <>
-      <div className="page room-page">
+      <div className="page room-page quiet-page">
         <div className="crawler-hidden">
           <img src={images.APP_LOGO_COS} height="132" width="132" />
           <p>{pageData.content?.title || (pageData.content?.seriesName ? `邀请你一起听《${pageData.content.seriesName}》` : "邀请你一起听！")}</p>
         </div>
 
         {pageData.state <= 2 && (
-          <div className="page-full">
-            <ListeningLoader />
-            <div className="pf-text"><span>{pageData.state === 1 ? "正在进入房间.." : "正在连接播放器.."}</span></div>
+          <div className="page-full room-state room-state_loading" role="status" aria-live="polite" aria-busy="true">
+            <div className="room-state__brand" aria-hidden="true">
+              <span className="room-state__brand-mark" />
+              <span>QUIET STUDIO</span>
+            </div>
+            <div className="room-state__visual">
+              <ListeningLoader />
+            </div>
+            <div className="pf-text">
+              <span className="room-state__eyebrow">同步聆听空间</span>
+              <h1>{pageData.state === 1 ? "正在进入房间" : "正在连接播放器"}</h1>
+              <p>{pageData.state === 1 ? "正在确认房间与成员信息，请稍候。" : "即将完成播放进度与音频状态同步。"}</p>
+            </div>
           </div>
         )}
 
@@ -154,14 +164,21 @@ export default function RoomPage() {
         </div>
 
         {pageData.state >= 11 && (
-          <div className="page-full">
-            <img src={pageData.state === 17 ? images.IMG_DOOR : images.IMG_PLACEHOLDER} className="pf-no-data-img" />
+          <div className="page-full room-state room-state_error" role="alert">
+            <div className="room-state__brand" aria-hidden="true">
+              <span className="room-state__brand-mark" />
+              <span>QUIET STUDIO</span>
+            </div>
+            <div className="room-state__error-mark" aria-hidden="true">
+              <span />
+            </div>
             <div className="pf-no-data-box">
+              <span className="room-state__eyebrow">房间暂时不可用</span>
               <h1>{stateTitle(pageData.state)}</h1>
               {stateMessage(pageData.state) && <p>{stateMessage(pageData.state)}</p>}
             </div>
             <div className="pf-no-data-btns">
-              <PtButton text={retryText(pageData.state)} type={contactText(pageData.state) ? "main" : "other"} onClick={pageData.state === 11 || pageData.state === 12 || pageData.state === 14 || pageData.state === 15 ? toHome : () => window.location.reload()} />
+              <PtButton text={retryText(pageData.state)} type="main" onClick={pageData.state === 11 || pageData.state === 12 || pageData.state === 14 || pageData.state === 15 ? toHome : () => window.location.reload()} />
               {contactText(pageData.state) && <PtButton className="pf-ndb-other" text={contactText(pageData.state)} type="other" onClick={toContact} />}
             </div>
           </div>
