@@ -57,7 +57,7 @@
 }
 
 .create-back span:first-child {
-  color: var(--accent-color, var(--theme-a));
+  color: var(--accent-text, var(--accent-color, var(--theme-a)));
   font-size: 22px;
   line-height: 1;
 }
@@ -137,7 +137,7 @@
   height: 34px;
   border-radius: 50%;
   background: var(--create-soft-accent);
-  color: var(--accent-color, var(--theme-a));
+  color: var(--create-accent-text);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .04em;

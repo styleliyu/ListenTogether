@@ -20,12 +20,16 @@ export default function RoomHeader({
   return (
     <header className="room-header">
       <div className="room-header__main">
+        <div className="room-header__brand" aria-label="Quiet Studio 房间">
+          <span className="room-header__brand-mark" aria-hidden="true" />
+          <span>QUIET STUDIO</span>
+        </div>
+        <h1>{title}</h1>
         <div className="room-header__eyebrow">
           <span>{isPersistent ? "常驻房间" : "临时房间"}</span>
           <span>{roomRole === "owner" ? "房主" : "成员"}</span>
           <span>{participantCount} 人在线</span>
         </div>
-        <h1>{title}</h1>
       </div>
       <div className="room-header__actions">
         <button className="room-ui-btn room-ui-btn_ghost" type="button" onClick={onLeave}>离开</button>

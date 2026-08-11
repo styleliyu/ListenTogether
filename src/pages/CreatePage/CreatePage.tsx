@@ -159,7 +159,7 @@ export default function CreatePage() {
   return (
     <>
       <form className="page create-page" onSubmit={submit} aria-labelledby="create-page-title">
-        <div className="page-container create-container">
+        <main className="page-container create-container">
           <header className="create-header">
             <button className="create-back" type="button" onClick={() => navigate("/")}>
               <span aria-hidden="true">←</span>
@@ -333,7 +333,7 @@ export default function CreatePage() {
               </div>
             )}
           </div>
-        </div>
+        </main>
       </form>
 
       {creatingFromQuery && (

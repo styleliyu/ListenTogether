@@ -1,7 +1,7 @@
 
 
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Inter, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
@@ -30,9 +30,22 @@
   --mini-font: 15px;
 }
 
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
 body {
   padding: 0;
   margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 a:link {
@@ -102,8 +115,10 @@ input {
 
 .app-global {
   height: max-content;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg-color);
+  color: var(--text-color);
   min-width: 250px;
 }
 
@@ -115,7 +130,7 @@ input {
   padding: 0 18px;
   font-size: var(--btn-font);
   cursor: pointer;
-  transition: background-color .15s, opacity .15s;
+  transition: background-color .15s, color .15s, opacity .15s, transform .15s;
 }
 
 .pt-button_main {
@@ -131,6 +146,116 @@ input {
 .pt-button:disabled {
   cursor: default;
   opacity: .48;
+}
+
+.pt-button_main:hover:not(:disabled) {
+  background-color: var(--hover-btn-bg);
+}
+
+.pt-button_other:hover:not(:disabled) {
+  background-color: var(--other-btn-hover);
+}
+
+.pt-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pt-button:focus-visible {
+  outline: 3px solid var(--focus-color, var(--text-color));
+  outline-offset: 3px;
+}
+
+/** Quiet Studio 页面共享骨架。页面业务组件只需负责自己的内容层级。 */
+.quiet-page {
+  --quiet-ink: var(--primary-text, var(--text-color));
+  --quiet-secondary: var(--secondary-text, var(--desc-color));
+  --quiet-accent: var(--accent-color, var(--theme-a));
+  --quiet-accent-text: var(--accent-text, var(--quiet-accent));
+  --quiet-border: var(--border-strong, var(--panel-border));
+  --quiet-soft-border: var(--panel-border);
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 86% 14%, var(--page-glow), transparent 25rem),
+    var(--page-bg, var(--bg-color));
+  color: var(--quiet-ink);
+}
+
+.quiet-topbar {
+  width: min(1120px, calc(100% - 48px));
+  min-height: 76px;
+  margin: 0 auto;
+  padding-top: 22px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.quiet-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--quiet-ink);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.quiet-brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid var(--quiet-accent);
+  border-radius: 50%;
+  color: var(--quiet-accent);
+  font-size: 22px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.quiet-brand-note {
+  margin-left: 5px;
+  color: var(--quiet-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+}
+
+.quiet-back {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--quiet-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: color .15s, background-color .15s, border-color .15s;
+}
+
+.quiet-back span:first-child {
+  color: var(--quiet-accent);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.quiet-back:hover {
+  border-color: var(--quiet-soft-border);
+  background: var(--panel-sub-bg, var(--card-color));
+  color: var(--quiet-ink);
+}
+
+.quiet-back:focus-visible {
+  outline: 3px solid var(--focus-color, var(--quiet-ink));
+  outline-offset: 3px;
 }
 
 .listening-loader {
@@ -166,5 +291,36 @@ input {
   50% {
     transform: scaleY(1);
     opacity: 1;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .quiet-topbar {
+    width: min(100% - 32px, 1120px);
+    min-height: 68px;
+    padding-top: 14px;
+    gap: 8px;
+  }
+
+  .quiet-brand-note {
+    display: none;
+  }
+
+  .quiet-back {
+    padding-right: 4px;
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-button,
+  .quiet-back {
+    transition: none;
+  }
+
+  .listening-loader span {
+    animation: none;
+    transform: scaleY(.72);
+    opacity: .8;
   }
 }

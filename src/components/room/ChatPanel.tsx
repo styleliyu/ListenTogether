@@ -72,12 +72,13 @@ const ChatPanel = memo(function ChatPanel({
     <section className="room-chat" aria-label="房间聊天与动态">
       <div className="room-chat__head">
         <div>
+          <div className="room-panel-kicker"><span aria-hidden="true" /> LIVE ROOM</div>
           <h2>聊天与动态</h2>
           <p>{messages.length > 0 || roomNotices.length > 0 ? `聊天 ${messages.length} 条 · 动态 ${roomNotices.length} 条` : "暂无聊天消息 · 暂无房间动态"}</p>
         </div>
       </div>
 
-      <div className="room-chat__messages" ref={messageListRef}>
+      <div className="room-chat__messages" ref={messageListRef} role="log" aria-live="polite" aria-relevant="additions text">
         {entries.length < 1 ? (
           <div className="room-chat__empty">
             <span>暂无聊天消息</span>
@@ -107,10 +108,14 @@ const ChatPanel = memo(function ChatPanel({
       </div>
 
       <form className="room-chat__form" onSubmit={onSubmit}>
+        <label className="room-chat__label" htmlFor="room-chat-message">发送消息</label>
         <textarea
+          id="room-chat-message"
           value={draft}
           rows={2}
           placeholder="输入消息，Enter 发送"
+          aria-describedby="room-chat-count room-chat-error"
+          aria-invalid={Boolean(errorText)}
           onChange={(event) => {
             setDraft(event.target.value)
             setLocalError("")
@@ -119,12 +124,12 @@ const ChatPanel = memo(function ChatPanel({
           onKeyDown={onKeyDown}
         />
         <div className="room-chat__footer">
-          <div className={`room-chat__count ${charCount > MAX_CHAT_CONTENT_LENGTH ? "room-chat__count_error" : ""}`}>
+          <div id="room-chat-count" className={`room-chat__count ${charCount > MAX_CHAT_CONTENT_LENGTH ? "room-chat__count_error" : ""}`}>
             {charCount}/{MAX_CHAT_CONTENT_LENGTH}
           </div>
           <button type="submit" disabled={charCount < 1 || charCount > MAX_CHAT_CONTENT_LENGTH}>发送</button>
         </div>
-        {errorText && <div className="room-chat__error">{errorText}</div>}
+        <div id="room-chat-error" className="room-chat__error" role="alert">{errorText}</div>
       </form>
     </section>
   )
