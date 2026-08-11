@@ -1,0 +1,11 @@
+{
+  "name": "youtube-fallback-poc",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server/index.js",
+    "test": "node dist/tests/fixtureSchema.test.js && node dist/tests/youtubeClient.test.js && node dist/tests/trackMatcher.test.js && node dist/tests/runtimeCandidateCoordinator.test.js && node dist/tests/playerFallback.test.js && node dist/tests/resolve.test.js",
+    "report:live": "node dist/tests/liveFixtureReport.js"
+  }
+}

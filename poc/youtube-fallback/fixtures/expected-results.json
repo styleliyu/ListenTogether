@@ -1,0 +1,21 @@
+[
+  { "id": "cn-sunny-day", "expectedOutcome": "pending_manual" },
+  { "id": "cn-night-song", "expectedOutcome": "pending_manual" },
+  { "id": "cn-perfectly-ordinary", "expectedOutcome": "pending_manual" },
+  { "id": "cn-light-years-away", "expectedOutcome": "pending_manual" },
+  { "id": "cn-actor", "expectedOutcome": "pending_manual" },
+  {
+    "id": "en-love-story",
+    "expectedOutcome": "pending_manual",
+    "mustRejectVersion": "taylor's version"
+  },
+  { "id": "en-bad-guy", "expectedOutcome": "pending_manual" },
+  { "id": "en-bohemian-rhapsody", "expectedOutcome": "pending_manual" },
+  { "id": "en-shape-of-you", "expectedOutcome": "pending_manual" },
+  { "id": "en-yellow", "expectedOutcome": "pending_manual" },
+  {
+    "id": "negative-does-not-exist",
+    "expectedOutcome": "unmatched",
+    "expectedVideoId": null
+  }
+]

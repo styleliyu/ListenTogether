@@ -1,0 +1,113 @@
+[
+  {
+    "id": "cn-sunny-day",
+    "track": {
+      "title": "晴天",
+      "artists": ["周杰伦"],
+      "durationMs": 269000,
+      "origin": { "provider": "netease", "resourceId": "fixture-cn-sunny-day" }
+    },
+    "versionInterference": ["live", "cover", "remix"]
+  },
+  {
+    "id": "cn-night-song",
+    "track": {
+      "title": "夜曲",
+      "artists": ["周杰伦"],
+      "durationMs": 231000,
+      "origin": { "provider": "netease", "resourceId": "fixture-cn-night-song" }
+    },
+    "versionInterference": ["live", "伴奏"]
+  },
+  {
+    "id": "cn-perfectly-ordinary",
+    "track": {
+      "title": "体面",
+      "artists": ["于文文"],
+      "durationMs": 274000,
+      "origin": { "provider": "tencent", "resourceId": "fixture-cn-perfectly-ordinary" }
+    },
+    "versionInterference": ["cover", "现场"]
+  },
+  {
+    "id": "cn-light-years-away",
+    "track": {
+      "title": "光年之外",
+      "artists": ["邓紫棋"],
+      "durationMs": 235000,
+      "origin": { "provider": "netease", "resourceId": "fixture-cn-light-years-away" }
+    },
+    "versionInterference": ["live", "acoustic"]
+  },
+  {
+    "id": "cn-actor",
+    "track": {
+      "title": "演员",
+      "artists": ["薛之谦"],
+      "durationMs": 262000,
+      "origin": { "provider": "netease", "resourceId": "fixture-cn-actor" }
+    },
+    "versionInterference": ["cover", "remaster"]
+  },
+  {
+    "id": "en-love-story",
+    "track": {
+      "title": "Love Story",
+      "artists": ["Taylor Swift"],
+      "durationMs": 236000,
+      "origin": { "provider": "tencent", "resourceId": "fixture-en-love-story" }
+    },
+    "versionInterference": ["taylor's version", "live", "cover"],
+    "rejectVersionTokens": ["taylor's version"]
+  },
+  {
+    "id": "en-bad-guy",
+    "track": {
+      "title": "bad guy",
+      "artists": ["Billie Eilish"],
+      "durationMs": 194000,
+      "origin": { "provider": "netease", "resourceId": "fixture-en-bad-guy" }
+    },
+    "versionInterference": ["live", "cover", "sped up"]
+  },
+  {
+    "id": "en-bohemian-rhapsody",
+    "track": {
+      "title": "Bohemian Rhapsody",
+      "artists": ["Queen"],
+      "durationMs": 355000,
+      "origin": { "provider": "local", "resourceId": "fixture-en-bohemian-rhapsody" }
+    },
+    "versionInterference": ["remaster", "live", "karaoke"]
+  },
+  {
+    "id": "en-shape-of-you",
+    "track": {
+      "title": "Shape of You",
+      "artists": ["Ed Sheeran"],
+      "durationMs": 234000,
+      "origin": { "provider": "kugou", "resourceId": "fixture-en-shape-of-you" }
+    },
+    "versionInterference": ["cover", "acoustic", "remix"]
+  },
+  {
+    "id": "en-yellow",
+    "track": {
+      "title": "Yellow",
+      "artists": ["Coldplay"],
+      "durationMs": 267000,
+      "origin": { "provider": "netease", "resourceId": "fixture-en-yellow" }
+    },
+    "versionInterference": ["live", "cover", "instrumental"]
+  },
+  {
+    "id": "negative-does-not-exist",
+    "track": {
+      "title": "This Track Should Not Exist In Search",
+      "artists": ["Fixture Artist 0000"],
+      "durationMs": 123000,
+      "origin": { "provider": "unknown", "resourceId": "fixture-negative" }
+    },
+    "expectedOutcome": "unmatched"
+  }
+]

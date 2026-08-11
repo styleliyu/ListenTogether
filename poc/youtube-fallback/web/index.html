@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YouTube Fallback POC</title>
+    <link rel="stylesheet" href="./poc.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">Phase 1 · isolated proof of concept</p>
+        <h1>YouTube fallback</h1>
+        <p class="lede">只观察元数据匹配与官方可见播放器，不代理、下载或提取 YouTube 媒体。</p>
+        <p id="health" class="health" role="status">正在检查 POC 服务…</p>
+      </header>
+
+      <section class="card" aria-labelledby="track-heading">
+        <h2 id="track-heading">TrackIdentity 输入</h2>
+        <div class="form-grid">
+          <label>标题 <input id="title" value="晴天" autocomplete="off" /></label>
+          <label>歌手（逗号分隔） <input id="artists" value="周杰伦" autocomplete="off" /></label>
+          <label>时长（毫秒，可选） <input id="duration" inputmode="numeric" value="269000" /></label>
+        </div>
+        <label class="check-row">
+          <input id="autoplay" type="checkbox" />
+          解析成功后尝试自动播放（用于观察 autoplay blocked 与用户恢复路径）
+        </label>
+        <button id="resolve" class="primary" type="button">调用 POC Resolver</button>
+      </section>
+
+      <section id="result-panel" class="card" aria-labelledby="result-heading" hidden>
+        <div class="section-heading">
+          <h2 id="result-heading">解析结果</h2>
+          <span id="result-kind" class="badge"></span>
+        </div>
+        <dl id="search-summary" class="summary"></dl>
+        <p id="final-selection" class="final-selection"></p>
+        <div id="candidates" class="candidate-list" aria-label="候选与过滤结果"></div>
+        <details>
+          <summary>原始响应</summary>
+          <pre id="raw-response"></pre>
+        </details>
+      </section>
+
+      <section id="player-panel" class="card player-card" aria-labelledby="player-heading" hidden>
+        <div class="section-heading">
+          <h2 id="player-heading">官方可见 YouTube IFrame Player</h2>
+          <a id="youtube-link" target="_blank" rel="noreferrer">在 YouTube 打开</a>
+        </div>
+        <div id="player-frame" class="player-frame" aria-label="YouTube 视频播放器"></div>
+        <div class="player-controls" aria-label="POC 播放控制">
+          <button id="play" type="button">播放</button>
+          <button id="pause" type="button">暂停</button>
+          <label>Seek（秒） <input id="seek-time" type="number" min="0" step="1" value="30" /></label>
+          <button id="seek" type="button">跳转</button>
+          <button id="recover" class="recovery" type="button" hidden>点击恢复播放</button>
+          <button id="official-sample-test" type="button">加载 YouTube 官方示例视频</button>
+          <button id="error-test" type="button">加载无效视频以验证 error</button>
+        </div>
+        <p id="current-time" class="current-time">currentTime：等待播放器</p>
+        <ol id="player-log" class="event-log" aria-live="polite"></ol>
+      </section>
+
+      <p id="request-error" class="request-error" role="alert" hidden></p>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
