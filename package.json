@@ -1,6 +1,7 @@
 {
   "name": "podcast-together",
   "version": "0.9.4",
+  "packageManager": "pnpm@8.15.9",
   "description": "一个基于 Vite + React + TypeScript 的全栈项目，让你跟好友一起实时同步听音乐、播客和本地音频。",
   "type": "module",
   "scripts": {
@@ -11,7 +12,7 @@
     "start": "npx http-server -P http://127.0.0.1:${PORT} ./dist"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18 <25"
   },
   "dependencies": {
     "browser-id3-writer": "^4.4.0",
