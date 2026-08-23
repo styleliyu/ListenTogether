@@ -108,7 +108,7 @@ npm run build
 npm start
 ```
 
-部署结构：前端 `dist` + 后端 `server/dist` + PM2 + Nginx。完整部署流程见 [DEPLOY_SERVER.md](./DEPLOY_SERVER.md)。
+当前生产部署使用 GitHub Actions + GHCR + Docker Compose，并保留宿主机 Nginx 管理 HTTPS。完整流程见 [docs/docker-deployment.md](./docs/docker-deployment.md)；旧 PM2 流程保留在 [DEPLOY_SERVER.md](./DEPLOY_SERVER.md) 供回滚参考。
 
 房间页 UI 调整只涉及前端展示和交互层，不需要变更数据库 schema，也不需要变更 WebSocket 消息协议。
 

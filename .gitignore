@@ -33,3 +33,9 @@ thirdparty-setting.ts
 
 # vite-plugin-pwa 生成的 dev-dist
 dev-dist
+
+# Production deployment state and credentials
+deploy/compose.env
+deploy/server.env
+deploy/data/
+deploy/backups/
