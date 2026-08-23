@@ -14,9 +14,10 @@ push main
 ```
 
 - 宿主机宝塔/Nginx继续管理域名和 HTTPS。
-- Web 容器仅监听宿主机 `127.0.0.1:8080`。
+- Web 容器仅监听宿主机 `127.0.0.1:18080`，避开现有的 `8080` 服务。
 - API 不暴露宿主机端口，只接受 Web 容器的 Docker 内网访问。
-- SQLite、上传文件和运行时 Cookie 挂载在 `/opt/listentogether/data`。
+- API 通过只读挂载的 Unix socket 访问宿主机现有 PostgreSQL，数据库端口不对容器网桥或公网开放。
+- 上传文件和运行时 Cookie 挂载在 `/opt/listentogether/data`。
 - 业务密钥只存放于服务器 `/opt/listentogether/server.env`。
 
 ## GitHub 配置
@@ -55,23 +56,30 @@ Workflow 使用仓库自动签发的 `GITHUB_TOKEN` 发布 GHCR，不需要个�
 
 `docker` 组具备等同 root 的主机控制能力，因此 `deploy` 只能用于本项目自动部署，不应作为日常登录账号。
 
-## 生产配置
+## PostgreSQL 与生产配置
 
-在 `/opt/listentogether` 创建：
+现有生产环境使用 PostgreSQL。以 root 运行一次准备脚本：
 
 ```bash
-cp compose.env.example compose.env
-cp server.env.example server.env
-chmod 600 compose.env server.env
+curl -fsSLo /root/listentogether-prepare-postgres.sh \
+  https://raw.githubusercontent.com/styleliyu/ListenTogether/main/deploy/prepare-postgres-server.sh
+chmod 700 /root/listentogether-prepare-postgres.sh
+bash /root/listentogether-prepare-postgres.sh
 ```
 
-将 `compose.env` 中的 `APP_UID`、`APP_GID` 改成服务器上 `deploy` 用户的实际 UID/GID。将现有后端 `.env` 的业务参数人工迁移到 `server.env`，不要把真实值提交到 GitHub。
+脚本会在任何修改前校验旧环境文件，不输出密钥，并执行以下操作：
 
-SQLite 路径、上传路径、监听地址和端口由 Compose固定覆盖，不要在 `server.env` 中重复填写。网易私钥如果写在单行环境文件中，使用字面量 `\n` 表示换行。
+- 自动定位 `pg_hba.conf`，先备份原文件，再为现有数据库和用户增加一条仅限 Unix socket 的密码认证规则；不开放 `5432`。
+- 使用 `pg_dump` 在 `/opt/listentogether/backups` 创建切换前数据库备份。
+- 从旧后端 `.env` 生成 `/opt/listentogether/server.env`，把数据库连接改为 Unix socket，并把两个配置文件权限设为 `600`。
+- 生成端口为 `18080`、UID/GID 与 `deploy` 用户一致的 `compose.env`。
+- 复制上传文件和运行时 Cookie，并修复旧 `.env` 原先过宽的文件权限。
 
-## 迁移现有 SQLite 和上传数据
+脚本拒绝覆盖已存在的 `server.env` 或 `compose.env`。网易私钥如果写在单行环境文件中，继续使用字面量 `\n` 表示换行。
 
-切换前必须备份当前生产数据。优先使用 SQLite 在线备份命令；如果服务器没有 `sqlite3`，先停止旧 PM2 进程再复制数据库、WAL 与上传目录，避免产生不一致快照。
+## 迁移现有数据
+
+首次准备会在线备份 PostgreSQL 并复制上传文件。正式切换前停止旧 PM2 后，应再次同步旧上传目录，防止准备和切换之间新增的文件遗漏。首次 Compose 验证成功前不要删除旧 PM2 目录。
 
 目标结构：
 
@@ -82,20 +90,19 @@ SQLite 路径、上传路径、监听地址和端口由 Compose固定覆盖，�
   server.env
   deploy.sh
   data/
-    podcast-together.db
     uploads/
     qq-music-cookie.txt
   backups/
+    postgres-allcanlisten-<时间>.dump
+    pg_hba.conf.<时间>
 ```
-
-迁移后让数据目录归属 `deploy` 的 UID/GID，并保留一次切换前备份。首次 Compose 验证成功前不要删除旧 PM2 目录。
 
 ## 宝塔/Nginx切换
 
 Compose 启动并且以下地址返回 `ok` 后再切换站点：
 
 ```bash
-curl --fail http://127.0.0.1:8080/healthz
+curl --fail http://127.0.0.1:18080/healthz
 ```
 
 将 HTTPS server block 中原有静态站点和 `/api`、`/ws` 规则替换成 `deploy/nginx-host.conf.example` 的统一反向代理配置。执行 `nginx -t` 成功后再重载 Nginx。
@@ -117,7 +124,7 @@ curl --fail http://127.0.0.1:8080/healthz
 ```bash
 cd /opt/listentogether
 docker compose --env-file compose.env ps
-curl --fail http://127.0.0.1:8080/healthz
+curl --fail http://127.0.0.1:18080/healthz
 ```
 
 还应通过浏览器验证首页、创建房间、WebSocket 双端同步和音频上传。应用仍是单 API 实例，发布会让现有 WebSocket 短暂重连，内存聊天记录会在重启时丢失。
