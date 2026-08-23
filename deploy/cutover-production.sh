@@ -99,7 +99,7 @@ import re
 import sys
 
 path = sys.argv[1]
-with open(path, "r") as source:
+with open(path, "r", encoding="utf-8") as source:
     config = source.read()
 
 replacements = {
@@ -142,7 +142,7 @@ config, count = vue_pattern.subn(proxy_location, config)
 if count != 1:
     raise SystemExit("Expected exactly one Vue history location block")
 
-with open(path, "w") as output:
+with open(path, "w", encoding="utf-8") as output:
     output.write(config)
 PY
 
