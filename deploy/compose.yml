@@ -8,13 +8,12 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3001
-      DATABASE_PROVIDER: sqlite
-      SQLITE_DB_PATH: /app/data/podcast-together.db
-      DATABASE_PATH: /app/data/podcast-together.db
+      DATABASE_PROVIDER: postgres
       UPLOAD_DIR: /app/data/uploads
       QQ_MUSIC_COOKIE_FILE: /app/data/qq-music-cookie.txt
     volumes:
       - ./data:/app/data
+      - /var/run/postgresql:/var/run/postgresql:ro
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     expose:
       - "3001"
@@ -40,7 +39,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+      - "127.0.0.1:${WEB_PORT:-18080}:8080"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
