@@ -164,8 +164,18 @@ fi
 
 "$nginx_bin" -s reload
 
-if ! public_health="$(curl --fail --silent --show-error --max-time 20 "$site_origin/healthz")" || \
-   [[ "$public_health" != "ok" ]]; then
+public_health=""
+for _attempt in {1..20}; do
+  if public_health="$(curl --fail --silent --show-error --max-time 5 \
+      --resolve podcast.still-fantasy.com:443:127.0.0.1 \
+      "$site_origin/healthz" 2>/dev/null)" && [[ "$public_health" == "ok" ]]; then
+    break
+  fi
+  public_health=""
+  sleep 1
+done
+
+if [[ "$public_health" != "ok" ]]; then
   echo "Public health check failed; restoring the original Nginx configuration." >&2
   restore_nginx
   exit 6
