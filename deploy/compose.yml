@@ -1,0 +1,56 @@
+name: listentogether
+
+services:
+  api:
+    image: ${API_IMAGE:-ghcr.io/styleliyu/listentogether-api}:${IMAGE_TAG:?IMAGE_TAG is required}
+    env_file:
+      - ./server.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+      DATABASE_PROVIDER: sqlite
+      SQLITE_DB_PATH: /app/data/podcast-together.db
+      DATABASE_PATH: /app/data/podcast-together.db
+      UPLOAD_DIR: /app/data/uploads
+      QQ_MUSIC_COOKIE_FILE: /app/data/qq-music-cookie.txt
+    volumes:
+      - ./data:/app/data
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    expose:
+      - "3001"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 4
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/styleliyu/listentogether-web}:${IMAGE_TAG:?IMAGE_TAG is required}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 4

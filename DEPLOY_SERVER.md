@@ -1,5 +1,7 @@
 # 自有云服务器部署说明
 
+> 当前生产部署已迁移为 GitHub Actions + GHCR + Docker Compose。新部署请使用 [docs/docker-deployment.md](./docs/docker-deployment.md)。本文仅保留旧 PM2 流程供排查和回滚参考。
+
 本文档用于把本项目从 Laf 后端切换到普通云服务器后端。服务器只需要 Node 18+、PM2、Nginx，不需要额外安装数据库，后端默认使用 SQLite。
 
 ## 1. 准备域名

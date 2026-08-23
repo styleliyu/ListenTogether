@@ -1,0 +1,13 @@
+**
+!package.json
+!pnpm-lock.yaml
+!tsconfig.json
+!tsconfig.node.json
+!vite.config.ts
+!index.html
+!src/
+!src/**
+!public/
+!public/**
+!docker/
+!docker/web-nginx.conf
